@@ -10,4 +10,9 @@ function krm_clean() {
     find . | grep -E "(/__pycache__$|\.pyc$|\.pyo$)" | xargs rm -rf
 }
 
+function krm_post_start() {
+    echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
+    docker buildx create --name krm-py --driver docker-container --use
+}
+
 krm_${@}

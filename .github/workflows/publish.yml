@@ -4,54 +4,17 @@ on:
   push:
     tags:
     - 'v*'
-  workflow_dispatch: {}
 
 permissions:
   id-token: write
 
 jobs:
+
   package:
-    name: Publish PyPI Package
-    runs-on: ubuntu-latest
-    environment: 
-      name: pypi
-      url: https://pypi.org/project/kubed-krm
-    outputs:
-      version: ${{ steps.check_version.outputs.version }}
-    steps:
-
-    - name: Checkout Code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        cache: pip
-
-    - name: Install Dependencies
-      run: pip install '.[build]'
-
-    - name: Check True Version
-      id: check_version
-      run: |
-        version=$(python -m setuptools_scm)
-        package="kubed_krm-${version}"
-        echo "Building Version: $version"
-        echo "version=$version" >> $GITHUB_OUTPUT
-        echo "package=$package" >> $GITHUB_OUTPUT
+    name: Publish
+    uses: ./.github/workflows/package.yml
     
-    - name: Run the Build
-      run: python -m build
-
-    - name: Show Files
-      run: ls -l dist
-
-    - name: Github Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ steps.check_version.outputs.package }}
-        path: dist/*.tar.gz
-        
-    - name: Publish Package to PyPI
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-      uses: pypa/gh-action-pypi-publish@release/v1
+  image:
+    name: Publish
+    uses: ./.github/workflows/image.yml
+    secrets: inherit

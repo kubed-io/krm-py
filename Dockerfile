@@ -21,10 +21,21 @@ FROM setup AS builder
 RUN python -m build --no-isolation
 
 ##
+# Build one with the slim py package.
+# This is a tiny standalone without any k8s tools added. 
+# This can be used with kustomize image annotations
+##
+FROM python:${PY_VERSION}-slim AS slim
+COPY --from=builder /app/dist ./dist/
+RUN pip install --no-cache-dir ./dist/*.whl && \
+    rm -rf ./dist
+ENTRYPOINT [ "kubectl-kubed" ]
+
+##
 # Final runtime image
 # This is pushed to the registry.
 ##
-FROM kubed/krm:latest AS runner
+FROM kubed/krm:latest AS suite
 ARG TARGETPLATFORM \
     BUILDPLATFORM
 
@@ -35,12 +46,22 @@ RUN apk --no-cache add \
 
 COPY --from=builder /app/dist ./dist/
 
-RUN pip install --break-system-packages --no-cache-dir ./dist/*.whl && \
-    rm -rf ./dist
+# RUN pip install --break-system-packages --no-cache-dir ./dist/*.whl && \
+#     rm -rf ./dist
+
+RUN <<EOF
+python3 -m venv ./venv
+. ./venv/bin/activate
+pip install --no-cache-dir ./dist/*.whl
+rm -rf ./dist
+chown -R krm:krm ./venv
+EOF
+
+ENV PATH="/workspace/venv/bin:$PATH"
 
 SHELL [ "/bin/bash", "-c" ]
 
-CMD ["kubed"]
+CMD ["kubectl-kubed"]
 
 ##
 # Dev container build

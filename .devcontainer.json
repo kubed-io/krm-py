@@ -34,7 +34,7 @@
 	// Uncomment the next line to run commands after the container is created.
 	// "postCreateCommand": "echo hello",
 
-	"postStartCommand": "echo 'eval \"$(direnv hook bash)\"' >> ~/.bashrc",
+	"postStartCommand": "./build.sh post_start",
 
 	// Configure tool-specific properties.
 	"customizations": {
