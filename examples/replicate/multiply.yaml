@@ -1,0 +1,38 @@
+apiVersion: krm.kubed.io
+kind: Replicate
+metadata:
+  name: spread-over-az
+spec:
+  # replicas: 5 
+  items: # can also be an array of values or the word 'random'
+  - region: us-west-1
+  - region: us-east-2
+  - region: eu-north-6
+  target:
+    name: foo-*
+    kind: "(Pod|Deployment|Service)"
+    matchLabels:
+      multiplied: "true"
+  overrides:
+  - patches: 
+    - op: replace 
+      path: /metadata/name
+      value: "{item[region]}-{status[iter]}"
+  - patches: 
+    - op: add
+      path: /metadata/labels/az
+      value: "{item[region]}-{status[i]}"
+  - target: 
+      name: foo-myapp-2-b
+    patches:
+    - op: add
+      path: /metadata/labels/favorite
+      value: "true"
+    - op: remove
+      path: "/metadata/labels/example"
+    
+
+
+
+
+  

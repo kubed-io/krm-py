@@ -1,0 +1,20 @@
+apiVersion: kubectl.kubed.io/v1
+kind: EnvMap
+metadata:
+  name: my-local-env
+  namespace: default
+env:
+- name: DB_PORT
+  value: '27017'
+- name: FOOD
+  valueFrom:
+    secretKeyRef:
+      name: junk
+      key: food
+- name: FOO
+  value: https:$(FOOD):$(DB_PORT)-$(foo)...$(FOOD)
+envFrom:
+- configMapRef: 
+    name: stuff
+- secretRef: 
+    name: box

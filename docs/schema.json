@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "age": {
+      "type": "integer",
+      "format": "int32",
+      "minimum": 0,
+      "nullable": true
+    },
+    "birth-date": {
+      "type": "string",
+      "format": "date"
+    },
+    "food": {
+      "type": "string",
+      "default": "pizza"
+    },
+    "getup": {
+      "type": "object",
+      "description": "Way too super cool",
+      "default": {},
+      "properties": {
+        "hat": {
+          "type": "boolean",
+          "default": true
+        },
+        "tie": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

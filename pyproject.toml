@@ -1,0 +1,110 @@
+[project]
+name = "kubed-krm"
+description = "Python implementation of the Kubernetes KRM Function Interface"
+readme = "README.md"
+dynamic = ["version"]
+requires-python = ">=3.10.0"
+keywords = [
+    "kubernetes",
+    "krm",
+    "kustomize",
+    "kubectl", 
+    "krew"
+]
+license-files = ["LICENSE"]
+authors = [
+{ name = "Kelly", email = "admin@kellyferrone.com" }
+]
+maintainers = [
+{ name = "Kelly", email = "admin@kellyferrone.com" }
+]
+dependencies = [
+  "requests>=2.22.0",
+  "cachetools>=5.2.0",
+  "jmespath>=1.0.1",
+  "pyyaml>=6.0.1",
+  "jsonpatch>=1.33",
+  "jsonpointer>=2.4",
+  "netaddr>=0.8.0",
+  "kubernetes>=33.1.0"
+]
+[project.optional-dependencies]
+build = [
+  "invoke",
+  "setuptools_scm",
+  "build",
+  "wheel",
+  "twine",
+  "pyinstaller",
+  "toml",
+  "semver"
+]
+[build-system]
+requires = [
+    "setuptools>=42",
+    "setuptools_scm[toml]>=6.2",
+    "build",
+    "wheel",
+    "twine"
+]
+build-backend = "setuptools.build_meta"
+
+[project.urls]
+Homepage = "https://github.com/kubed-io"
+Documentation = "https://github.com/kubed-io/krm-py"
+Repository = "https://github.com/kubed-io/krm-py"
+Issues = "https://github.com/kubed-io/krm-py/issues"
+Changelog = "https://github.com/kubed-io/krm-py/blob/main/CHANGELOG.md"
+LatestRelease = "https://github.com/kubed-io/krm-py/releases"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "src --verbose --cov=src --cov-report term-missing"
+testpaths = [
+  "src/tests"
+]
+pythonpath = [
+  "src"
+]
+markers = [
+  "integration: mark a test as an integration test",
+  "unit: mark a test as a unit test"
+]
+
+[tool.coverage.run]
+omit = [
+  "*_test.py",
+  "foo.py",
+  "src/tests/*",
+  "**/__*__.py"
+]
+
+[tool.ruff]
+exclude = [
+  "**/*_test.py", 
+  "**/test_*.py",
+  "src/tests/*"
+]
+
+[tool.setuptools_scm]
+
+[tool.setuptools]
+include-package-data = true
+# packages = ["kubed"]
+# package-dir={'kubed' = 'kubed'}
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = [
+  "tests","docs","examples", ".*"
+]
+
+[project.scripts]
+kubectl-kubed = "kubed.krm.common:execute"
+kubectl-setenv = "kubed.kubectl.envmap:setenv"
+
+[project.entry-points."krm.kubed.io"]
+embed = "kubed.kustomize.embed:transform"
+replicate = "kubed.kustomize.replicate:transform"
+lastpasssecret = "kubed.kustomize.lastpass:generate"
+filter = "kubed.kustomize.filter.__init__:transform"

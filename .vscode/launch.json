@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "Kubed KRM",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src/krm/common.py",
+            "console": "integratedTerminal",
+            "consoleName": "KRM Debugger",
+            "justMyCode": true,
+            "args": [
+
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {}
+        }
+    ]
+}

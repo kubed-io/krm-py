@@ -1,0 +1,62 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/docker-existing-docker-compose
+{
+	"name": "Kubed KRM Dev",
+
+	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
+	// The .devcontainer/docker-compose.yml file contains any overrides you need/want to make.
+	// "service": "kubed-dev",
+	// "runServices": [],
+	// "dockerComposeFile": [
+	// 	"docker-compose.yaml"
+	// ],
+	
+	"build": {
+		"dockerfile": "Dockerfile",
+		"target": "dev"
+	},
+	// The optional 'workspaceFolder' property is the path VS Code should open by default when
+	// connected. This is typically a file mount in .devcontainer/docker-compose.yml
+	"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	"features": {
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {}
+	},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// Uncomment the next line if you want to keep your containers running after VS Code shuts down.
+	// "shutdownAction": "none",
+
+	// Uncomment the next line to run commands after the container is created.
+	// "postCreateCommand": "echo hello",
+
+	"postStartCommand": "echo 'eval \"$(direnv hook bash)\"' >> ~/.bashrc",
+
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-python.debugpy",
+				"redhat.vscode-yaml",
+				"charliermarsh.ruff",
+				"ms-kubernetes-tools.vscode-kubernetes-tools",
+				"mads-hartmann.bash-ide-vscode",
+				"github.copilot",
+				"tamasfe.even-better-toml",
+				"github.vscode-github-actions"
+			],
+			"settings": {
+				"python.defaultInterpreterPath": "/workspaces/krm-py/.direnv/python-3.12.11/bin/python"
+			}
+		}
+	}
+
+	// Uncomment to connect as an existing user other than the container default. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "devcontainer"
+}

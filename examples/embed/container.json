@@ -1,0 +1,14 @@
+{
+  "name": "app",
+  "image": "alpine",
+  "env": [
+    {
+      "name": "SOME_JSON"
+    },
+    {
+      "name": "IAM_POLICY"
+    }
+  ],
+  "command": [ "/bin/bash", "-c" ],
+  "args": []
+}

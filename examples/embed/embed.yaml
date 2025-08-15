@@ -1,0 +1,61 @@
+apiVersion: krm.kubed.io
+kind: Embed
+metadata:
+  name: embed-container-example
+  annotations:
+    kubernetes.io/description: >-
+      Here we use the actual annotation to run the true KRM instead of the legacy way. 
+      The embed simply puts a containers yaml from a separate file into a pod.  
+    config.kubernetes.io/function: |
+      exec: 
+        path: kubectl-kubed
+spec:
+  target:
+    kind: Pod
+    fieldPath: /spec/containers/0
+  file: container.json
+  nested: true
+---
+apiVersion: krm.kubed.io
+kind: Embed
+metadata:
+  name: embed-script-example
+  annotations:
+    config.kubernetes.io/function: |
+      exec: 
+        path: kubectl-kubed
+spec:
+  target:
+    kind: Pod 
+    fieldPath: /spec/containers/0/args/0
+  file: some.sh
+---
+apiVersion: krm.kubed.io
+kind: Embed
+metadata:
+  name: embed-parsed-example
+  annotations:
+    config.kubernetes.io/function: |
+      exec: 
+        path: kubectl-kubed
+spec:
+  target:
+    kind: Pod 
+    fieldPath: /spec/containers/0/env/0/value
+  file: some.yaml
+  parse: json
+---
+apiVersion: krm.kubed.io
+kind: Embed
+metadata:
+  name: embed-url-example
+  annotations:
+    config.kubernetes.io/function: |
+      exec: 
+        path: kubectl-kubed
+spec:
+  target:
+    kind: Pod 
+    fieldPath: /spec/containers/0/env/1/value
+  file: https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/docs/install/iam_policy.json
+  parse: yaml

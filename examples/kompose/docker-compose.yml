@@ -1,0 +1,26 @@
+version: "3.7"
+
+services:
+  nginx:
+    image: nginx
+    labels:
+      app: nginx
+      kompose.service.type: loadbalancer
+      kompose.service.expose: "true"
+    container_name: app
+    hostname: nginx
+    volumes:
+    - web:/usr/share/nginx/html:Z
+    tmpfs:
+    - /run
+    deploy:
+      replicas: 10
+    ports: 
+    - target: 80
+      published: 8080
+
+volumes:
+  web:
+    name: webvol
+    labels: 
+      volume.kubernetes.io/storageClassName: nfs

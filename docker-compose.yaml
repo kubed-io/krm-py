@@ -1,0 +1,30 @@
+services:
+
+  kubed-krm-py:
+    image: &image kubed/krm-py:latest
+    build:
+      target: runner
+      tags:
+      - *image
+      - kubed/krm-py:${GIT_SHA:-latest}
+      - kubed/krm-py:${GIT_REF:-latest}
+      - kubed/krm-py:${GIT_TAG:-latest}
+      x-bake:
+        platforms:
+        - linux/amd64
+        - linux/arm64
+        cache-to: type=gha,mode=max,scope=kubed-krm-py
+        cache-from: type=gha,scope=kubed-krm-py
+    container_name: kubed-krm-py
+    stdin_open: true
+    tty: true
+    privileged: true
+    volumes:
+    - ./examples:/examples
+    entrypoint:
+    - /bin/bash
+    - -c
+    command: 
+    - tail
+    - -f
+    - /dev/null

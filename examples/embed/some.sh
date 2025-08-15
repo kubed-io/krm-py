@@ -1,0 +1,1 @@
+echo $SOME_JSON

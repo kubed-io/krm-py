@@ -1,0 +1,39 @@
+apiVersion: kubed.io
+kind: LpassSecret
+metadata:
+  name: tester
+id: Chase Credit Personal
+class: bank-card
+type: Transparent
+data:
+- name: number
+  key: Number
+- key: Name on Card
+  name: owner
+---
+apiVersion: kubed.io
+kind: LpassSecret
+metadata:
+  name: ssh-key
+  labels:
+    fruit: apples
+id: big-box-main
+class: ssh-key
+---
+apiVersion: kubed.io
+kind: LpassSecret
+metadata:
+  name: ActBlue
+  annotations:
+    whodidit: I did!
+class: password
+---
+apiVersion: kubed.io
+kind: LpassSecret
+metadata:
+  name: some-email
+  namespace: kube-system
+  annotations:
+    provider: google
+class: smtp
+id: Google Main

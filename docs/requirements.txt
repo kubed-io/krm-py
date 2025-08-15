@@ -1,0 +1,10 @@
+sphinx
+myst-parser
+linkify-it-py
+sphinx-jinja
+sphinx-theme
+sphinx-gallery
+sphinx-panels
+sphinx-jsonschema
+sphinx-copybutton
+docutils == 0.16

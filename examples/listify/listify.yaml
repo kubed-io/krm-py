@@ -1,0 +1,12 @@
+apiVersion: kubed.io
+kind: ListWrap
+metadata:
+  name: wrap-it-up
+  annotations:
+    config.kubernetes.io/function: |
+
+      exec: 
+        path: kubectl-kubed
+target: 
+  kind: Deployment
+  

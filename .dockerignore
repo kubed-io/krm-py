@@ -1,0 +1,14 @@
+.vscode
+build
+dist
+examples
+helm
+lpass
+.editorconfig
+.gitignore
+!.git
+.gitmodules
+docker-compose.yaml
+Dockerfile
+ecr.yaml 
+.DS_STORE

@@ -1,0 +1,33 @@
+apiVersion: krm.kubed.io
+kind: Replicate
+metadata:
+  name: domain-replicas
+  namespace: mastery
+  labels:
+    stuff.junk/garbage: stinky
+spec:
+  items:
+  - name: foo
+    url: google.com
+  - name: bar
+    url: facebook.com
+  template:
+    apiVersion: v1
+    kind: Service
+    metadata:
+      labels: 
+        pizza.kind/stuffed: pineapple
+    spec:
+      type: ExternalName
+  overrides:
+  - patches: 
+    - op: replace
+      path: /metadata/name
+      value: "{}-{item[name]}"
+    - op: add
+      path: /spec/externalName
+      value: "{item[url]}"
+    - op: replace 
+      path: /metadata/labels/pizza.kind~1stuffed
+      value: "{}-{item[name]}"
+  

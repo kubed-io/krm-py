@@ -1,0 +1,74 @@
+secretClass:
+
+- name: note
+  data:
+  - key: notes
+
+- name: password
+  data:
+  - key: username
+  - key: password
+  - key: url
+  - key: notes
+
+- name: ssh-key
+  data:
+  - key: Private Key
+    name: id_rsa
+  - key: Public Key
+    name: id_rsa.pub
+  - key: Passphrase
+    name: passphrase
+  - key: Hostname
+    name: hostname
+  - key: notes
+  
+- name: bank-card
+  data:
+  - key: Name on Card
+    name: name-on-card
+  - key: Type
+    name: type
+  - key: Security Code
+    name: security-code
+  - key: Number
+    name: number
+  - key: Start Date
+    name: start-date
+  - key: Expiration Date
+    name: expiration-date
+  - key: notes
+
+- name: address
+  data:
+  - key: Title
+  - key: First Name
+  - key: Middle Name
+  - key: Last Name
+  - key: Username
+  - key: Company
+  - key: Gender
+  - key: Address 1
+  - key: Address 2
+  - key: Address 3
+  - key: Country
+  - key: State
+  - key: Zip / Postal Code
+  - key: Timezone
+  - key: Language
+  - key: Mobile Phone
+  - key: Evening Phone
+  - key: Phone
+  - key: Email Address
+  - key: notes
+
+- name: smtp
+  data:
+  - key: username
+  - key: password
+  - key: server
+  - key: port
+  - key: type
+  - key: SMTP Server
+  - key: SMTP Port
+  - key: notes
