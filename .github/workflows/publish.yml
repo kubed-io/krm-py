@@ -6,6 +6,9 @@ on:
     - 'v*'
   workflow_dispatch: {}
 
+permissions:
+  id-token: write
+
 jobs:
   package:
     name: Publish PyPI Package
