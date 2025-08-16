@@ -11,10 +11,81 @@ permissions:
 jobs:
 
   package:
-    name: Publish
-    uses: ./.github/workflows/package.yml
+    name: Package
+    runs-on: ubuntu-latest
+    environment: 
+      name: pypi
+      url: https://pypi.org/project/kubed-krm
+    steps:
+
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        cache: pip
+
+    - name: Install Dependencies
+      run: pip install '.[build]'
+
+    - name: Check True Version
+      id: check_version
+      run: |
+        version=$(python -m setuptools_scm)
+        package="kubed_krm-${version}"
+        echo "Building Version: $version"
+        echo "version=$version" >> $GITHUB_OUTPUT
+        echo "package=$package" >> $GITHUB_OUTPUT
+    
+    - name: Run the Build
+      run: python -m build
+
+    - name: Show Files
+      run: ls -l dist
+
+    - name: Github Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.check_version.outputs.package }}
+        path: dist/*.tar.gz
+        
+    - name: Publish Package to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
     
   image:
-    name: Publish
-    uses: ./.github/workflows/image.yml
-    secrets: inherit
+    name: Image
+    runs-on: ubuntu-latest
+    environment: 
+      name: dockerhub
+      url: https://hub.docker.com/r/kubed/krm-py
+    steps:
+
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup QEMU
+      id: setup-qemu
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Set Image Args
+      run: |
+        {
+          echo "GIT_REF=$(echo ${GITHUB_REF##*/} | sed -e 's/\//_/g')";
+          echo "GIT_SHA=$(git rev-parse --short HEAD)";
+          echo "PY_VERSION=$(cat .python-version)";
+        } >> $GITHUB_ENV
+      
+    - name: Login to DockerHub
+      id: login-dockerhub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and Push
+      run: docker buildx bake --push
