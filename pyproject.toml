@@ -102,9 +102,13 @@ exclude = [
 [project.scripts]
 kubectl-kubed = "kubed.krm.common:execute"
 kubectl-setenv = "kubed.kubectl.envmap:setenv"
+kubectl-fn = "kubed.kubectl.fn:main"
 
 [project.entry-points."krm.kubed.io"]
 embed = "kubed.kustomize.embed:transform"
 replicate = "kubed.kustomize.replicate:transform"
 lastpasssecret = "kubed.kustomize.lastpass:generate"
 filter = "kubed.kustomize.filter.__init__:transform"
+
+[project.entry-points."serverless.krm.kubed.io"]
+service = "kubed.kustomize.service:transform"

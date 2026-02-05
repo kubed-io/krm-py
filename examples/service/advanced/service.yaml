@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=../../../spec/service.schema.json
+apiVersion: serverless.krm.kubed.io/v1
+kind: Service
+metadata:
+  name: api
+  namespace: flow
+  labels:
+    app: api
+    example: advanced
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: kubectl-kubed
+spec:
+  package:
+    include:
+    - '*.py'
+    - requirements.txt
+    source:
+      type: url
+      url: https://storage.googleapis.com/your-functions-bucket/api-v1.zip
+      checksum:
+        type: sha256
+        sum: "0000000000000000000000000000000000000000000000000000000000000000"
+    buildcmd: ./build.sh
+  environment:
+    name: python
+  functionTemplate:
+    secrets:
+    - name: api-credentials
+    requestsPerPod: 5
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "256Mi"
+    triggers:
+    - http: {}
+  functions:
+  - name: list
+    functionName: main.list_items
+    description: List all items
+  - name: get
+    functionName: main.get_item
+    description: Get item by ID
+  - name: create
+    functionName: main.create_item
+    description: Create new item
+    triggers:
+    - http:
+        method: POST
+  - name: delete
+    functionName: main.delete_item
+    description: Delete item
+    triggers:
+    - http:
+        method: DELETE

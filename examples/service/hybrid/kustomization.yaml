@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: calculator-hybrid-example
+  annotations:
+    kubernetes.io/description: |
+      Hybrid example: embedded main.py + included utils.py + ConfigMap + Secret.
+      Shows mixing literal source with file includes, ConfigMap, and Secret.
+namespace: flow
+configMapGenerator:
+- name: calculator-config
+  literals:
+  - version=1.0.0
+  - service=calculator
+  - description=Hybrid example with embedded and included files
+  options:
+    disableNameSuffixHash: true
+secretGenerator:
+- name: calculator-secret
+  literals:
+  - api_key=example-key-abc123
+  - api_secret=example-secret-xyz789
+  options:
+    disableNameSuffixHash: true
+generators:
+- service.yaml

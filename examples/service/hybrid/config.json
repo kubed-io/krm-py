@@ -1,0 +1,5 @@
+{
+  "version": "1.0.0",
+  "service": "calculator",
+  "description": "Hybrid example combining embedded main.py with included utility files"
+}

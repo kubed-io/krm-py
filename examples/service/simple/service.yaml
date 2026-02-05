@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=../../../spec/service.schema.json
+apiVersion: serverless.krm.kubed.io/v1
+kind: Service
+metadata:
+  name: hello
+  namespace: flow
+  labels:
+    app: hello
+    example: simple
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: kubectl-kubed
+spec:
+  package:
+    source:
+      type: literal
+      literal: |
+        from flask import request, jsonify
+
+        def greet():
+            """Simple greeting function"""
+            name = request.args.get('name', 'World')
+            return jsonify({
+                "message": f"Hello, {name}!",
+                "service": "hello",
+                "example": "simple-embedded"
+            })
+  environment:
+    name: python
+  functions:
+  - name: greet
+    functionName: main.greet
+    triggers:
+    - http: {}

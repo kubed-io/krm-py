@@ -1,0 +1,71 @@
+# yaml-language-server: $schema=../../../spec/service.schema.json
+apiVersion: serverless.krm.kubed.io/v1
+kind: Service
+metadata:
+  name: calculator
+  namespace: flow
+  labels:
+    app: calculator
+    example: hybrid
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: kubectl-kubed
+spec:
+  package:
+    include:
+    - utils.py
+    - config.json
+    source:
+      type: literal
+      literal: |
+        from flask import request, jsonify
+        from utils import add, subtract, multiply, divide
+        import json
+
+        # Load config
+        with open('config.json', 'r') as f:
+            config = json.load(f)
+
+        def calculate():
+            """Perform calculation based on operation parameter"""
+            operation = request.args.get('op', 'add')
+            a = float(request.args.get('a', 0))
+            b = float(request.args.get('b', 0))
+
+            ops = {
+                'add': add,
+                'subtract': subtract,
+                'multiply': multiply,
+                'divide': divide
+            }
+
+            if operation not in ops:
+                return jsonify({"error": f"Unknown operation: {operation}"}), 400
+
+            try:
+                result = ops[operation](a, b)
+                return jsonify({
+                    "operation": operation,
+                    "a": a,
+                    "b": b,
+                    "result": result,
+                    "version": config['version'],
+                    "example": "hybrid"
+                })
+            except Exception as e:
+                return jsonify({"error": str(e)}), 400
+  environment:
+    name: python
+  functionTemplate:
+    requestsPerPod: 5
+    secrets:
+    - name: calculator-secret
+    configmaps:
+    - name: calculator-config
+    triggers:
+    - http: {}
+  functions:
+  - name: calculate
+    functionName: main.calculate
+    description: Calculator with multiple operations

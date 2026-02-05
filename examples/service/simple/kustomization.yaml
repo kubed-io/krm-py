@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: hello-simple-example
+  annotations:
+    kubernetes.io/description: |
+      Simple embedded source example. Code is embedded directly in service.yaml.
+namespace: flow
+generators:
+- service.yaml

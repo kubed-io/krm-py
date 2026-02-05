@@ -93,7 +93,8 @@ def dump(krm: dict):
   Args:
     krm: The final KRM ResourceList with all transformations. 
   """
-  if "config.kubernetes.io/function" in krm["functionConfig"]["metadata"]["annotations"]:
+  annotations = krm["functionConfig"]["metadata"].get("annotations", {})
+  if "config.kubernetes.io/function" in annotations:
     # print("Running krm function", file=sys.stderr)
     yaml.safe_dump(krm, sys.stdout, default_flow_style=False);
   else:

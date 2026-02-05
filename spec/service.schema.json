@@ -1,0 +1,433 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://serverless.krm.kubed.io/v1/service.schema.json",
+  "title": "Fission Service",
+  "description": "Declarative Service resource that generates Fission Package, Functions, and HTTPTriggers",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": ["serverless.krm.kubed.io/v1"],
+      "description": "API version for the Service resource"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["Service"],
+      "description": "Resource type"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Service name (kebab-case recommended)",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Kubernetes namespace (default: flow)",
+          "default": "flow"
+        },
+        "labels": {
+          "type": "object",
+          "description": "Labels to apply to all generated resources",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Annotations for the Service resource (not propagated)",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "properties": {
+            "config.kubernetes.io/function": {
+              "type": "string",
+              "description": "Kustomize function annotation (should be: exec:\\n  path: kubectl-kubed)"
+            }
+          }
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["package", "environment", "functions"],
+      "properties": {
+        "package": {
+          "type": "object",
+          "description": "Package specification",
+          "required": ["source"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Package name (defaults to service name)"
+            },
+            "include": {
+              "type": "array",
+              "description": "Glob patterns for files to include in package",
+              "items": {
+                "type": "string"
+              },
+              "default": ["*.py"]
+            },
+            "source": {
+              "type": "object",
+              "description": "Package source location",
+              "required": ["type"],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["url", "literal"],
+                  "description": "Source type: 'url' for GCS, 'literal' for embedded code"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "GCS URL (for type: url, set by kubectl fn publish)",
+                  "format": "uri"
+                },
+                "literal": {
+                  "type": "string",
+                  "description": "Embedded Python code (for type: literal, will be saved as main.py)"
+                },
+                "checksum": {
+                  "type": "object",
+                  "description": "Package checksum (for type: url)",
+                  "required": ["type", "sum"],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": ["sha256"],
+                      "description": "Checksum algorithm"
+                    },
+                    "sum": {
+                      "type": "string",
+                      "description": "Checksum value (set by kubectl fn publish)",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  }
+                }
+              }
+            },
+            "buildcmd": {
+              "type": "string",
+              "description": "Build script path (e.g., ./build.sh) - auto-included in package"
+            }
+          }
+        },
+        "environment": {
+          "type": "object",
+          "description": "Fission environment specification",
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Environment name (e.g., python)",
+              "default": "python"
+            },
+            "namespace": {
+              "type": "string",
+              "description": "Environment namespace (defaults to service namespace)"
+            }
+          }
+        },
+        "functionTemplate": {
+          "type": "object",
+          "description": "Default configuration for all functions (cascading)",
+          "properties": {
+            "invokeStrategy": {
+              "$ref": "#/definitions/invokeStrategy"
+            },
+            "requestsPerPod": {
+              "type": "integer",
+              "description": "Max requests per pod before refresh",
+              "minimum": 1,
+              "default": 1
+            },
+            "retainPods": {
+              "type": "integer",
+              "description": "Minimum pods to retain",
+              "minimum": 0,
+              "default": 0
+            },
+            "concurrency": {
+              "type": "integer",
+              "description": "Max concurrent requests",
+              "minimum": 1
+            },
+            "functionTimeout": {
+              "type": "integer",
+              "description": "Function timeout in seconds",
+              "minimum": 1
+            },
+            "idletimeout": {
+              "type": "integer",
+              "description": "Idle timeout in seconds",
+              "minimum": 0
+            },
+            "onceOnly": {
+              "type": "boolean",
+              "description": "Run once then terminate"
+            },
+            "resources": {
+              "$ref": "#/definitions/resources"
+            },
+            "secrets": {
+              "type": "array",
+              "description": "Default secrets for all functions (no-merge: function overrides replace entirely)",
+              "items": {
+                "$ref": "#/definitions/secretReference"
+              }
+            },
+            "configmaps": {
+              "type": "array",
+              "description": "Default ConfigMaps for all functions (no-merge: function overrides replace entirely)",
+              "items": {
+                "$ref": "#/definitions/configMapReference"
+              }
+            },
+            "podspec": {
+              "type": "object",
+              "description": "Custom pod spec"
+            },
+            "triggers": {
+              "type": "array",
+              "description": "Default HTTP triggers for all functions (no-merge: function overrides replace entirely)",
+              "items": {
+                "$ref": "#/definitions/trigger"
+              }
+            }
+          }
+        },
+        "functions": {
+          "type": "array",
+          "description": "Function definitions",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name", "functionName"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Function name (short, kebab-case)",
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+              },
+              "functionName": {
+                "type": "string",
+                "description": "Entry point (e.g., main.handler, main.get_accounts)"
+              },
+              "description": {
+                "type": "string",
+                "description": "Function description (becomes kubernetes.io/description annotation)"
+              },
+              "invokeStrategy": {
+                "$ref": "#/definitions/invokeStrategy"
+              },
+              "requestsPerPod": {
+                "type": "integer",
+                "description": "Override: Max requests per pod",
+                "minimum": 1
+              },
+              "retainPods": {
+                "type": "integer",
+                "description": "Override: Minimum pods to retain",
+                "minimum": 0
+              },
+              "concurrency": {
+                "type": "integer",
+                "description": "Override: Max concurrent requests",
+                "minimum": 1
+              },
+              "functionTimeout": {
+                "type": "integer",
+                "description": "Override: Function timeout in seconds",
+                "minimum": 1
+              },
+              "idletimeout": {
+                "type": "integer",
+                "description": "Override: Idle timeout in seconds",
+                "minimum": 0
+              },
+              "onceOnly": {
+                "type": "boolean",
+                "description": "Override: Run once then terminate"
+              },
+              "resources": {
+                "$ref": "#/definitions/resources"
+              },
+              "secrets": {
+                "type": "array",
+                "description": "Override: Secrets (no merge - replaces defaults)",
+                "items": {
+                  "$ref": "#/definitions/secretReference"
+                }
+              },
+              "configmaps": {
+                "type": "array",
+                "description": "Override: ConfigMaps (no merge - replaces defaults)",
+                "items": {
+                  "$ref": "#/definitions/configMapReference"
+                }
+              },
+              "podspec": {
+                "type": "object",
+                "description": "Override: Custom pod spec"
+              },
+              "triggers": {
+                "type": "array",
+                "description": "Override: HTTP triggers (no merge - replaces defaults)",
+                "items": {
+                  "$ref": "#/definitions/trigger"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "invokeStrategy": {
+      "type": "object",
+      "description": "Function invocation strategy",
+      "required": ["StrategyType"],
+      "properties": {
+        "StrategyType": {
+          "type": "string",
+          "enum": ["execution", "newdeploy"],
+          "description": "Strategy type (poolmgr or newdeploy)",
+          "default": "execution"
+        },
+        "ExecutionStrategy": {
+          "type": "object",
+          "description": "Execution strategy configuration",
+          "required": ["ExecutorType"],
+          "properties": {
+            "ExecutorType": {
+              "type": "string",
+              "enum": ["poolmgr", "newdeploy"],
+              "description": "Executor type",
+              "default": "poolmgr"
+            },
+            "MinScale": {
+              "type": "integer",
+              "description": "Minimum replicas (newdeploy only)",
+              "minimum": 0
+            },
+            "MaxScale": {
+              "type": "integer",
+              "description": "Maximum replicas (newdeploy only)",
+              "minimum": 1
+            },
+            "TargetCPUPercent": {
+              "type": "integer",
+              "description": "Target CPU for autoscaling (newdeploy only)",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Resource requests and limits",
+      "properties": {
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "description": "CPU request (e.g., 100m, 1)"
+            },
+            "memory": {
+              "type": "string",
+              "description": "Memory request (e.g., 128Mi, 1Gi)"
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "description": "CPU limit (e.g., 1, 2)"
+            },
+            "memory": {
+              "type": "string",
+              "description": "Memory limit (e.g., 512Mi, 2Gi)"
+            }
+          }
+        }
+      }
+    },
+    "configMapReference": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "ConfigMap name"
+        },
+        "namespace": {
+          "type": "string",
+          "description": "ConfigMap namespace"
+        }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "description": "HTTP trigger configuration",
+      "properties": {
+        "http": {
+          "type": "object",
+          "description": "HTTP trigger specification",
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+              "description": "HTTP method",
+              "default": "GET"
+            },
+            "path": {
+              "type": "string",
+              "description": "HTTP path (default: /<service>/<function>)",
+              "pattern": "^/.*"
+            },
+            "host": {
+              "type": "string",
+              "description": "Host header match (default: empty = match all)"
+            },
+            "prefix": {
+              "type": "string",
+              "description": "Path prefix match"
+            },
+            "ingressConfig": {
+              "type": "object",
+              "description": "Ingress configuration",
+              "properties": {
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "path": {
+                  "type": "string"
+                },
+                "host": {
+                  "type": "string"
+                },
+                "tls": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
