@@ -5,6 +5,7 @@ Generates Fission Package, Functions, and HTTPTriggers from a declarative Servic
 
 from kubed.krm import common as c
 import copy
+from kubed.krm.errors import plugin_fail
 import zipfile
 import tempfile
 import base64
@@ -81,9 +82,27 @@ def transform(krm: dict) -> dict:
     )
     krm["items"].append(package)
 
+    # Validate functions list
+    functions_list = spec.get("functions", [])
+    if not functions_list:
+        plugin_fail("Error: spec.functions must contain at least one function")
+
+    # Validate that if name is omitted, there is only one function
+    unnamed_count = sum(1 for f in functions_list if "name" not in f)
+    if unnamed_count > 0 and len(functions_list) > 1:
+        plugin_fail("Error: 'name' is required for each function when there are multiple functions")
+
     # Generate Functions and HTTPTriggers
     for func_def in spec["functions"]:
-        func_name = f"{service_name}-{func_def['name']}"
+        # Default function name to service name if not provided
+        short_name = func_def.get('name', service_name)
+
+        # If function name equals service name (default), use service name directly for resource name
+        # Otherwise use service-name pattern
+        if short_name == service_name and "name" not in func_def:
+            func_name = service_name
+        else:
+            func_name = f"{service_name}-{short_name}"
 
         # Merge function defaults with per-function overrides
         func_config = merge_function_config(function_defaults, func_def)
@@ -156,7 +175,7 @@ def transform(krm: dict) -> dict:
                 labels=labels,
                 function_name=func_name,
                 service_name=service_name,
-                short_function_name=func_def['name'],
+                short_function_name=short_name,
                 trigger_spec=trigger.get("http", {})
             )
             krm["items"].append(http_trigger)
@@ -205,8 +224,20 @@ def generate_package(name, namespace, labels, package_spec, env_name, env_namesp
     if "source" in package_spec:
         source_spec = package_spec["source"]
 
+        # Infer source type if not specified:
+        # - If 'literal' key exists, type is 'literal'
+        # - If 'url' key exists, type is 'url'
+        # - If 'type' is explicitly set, that takes precedence
+        inferred_type = None
+        if "type" in source_spec:
+            inferred_type = source_spec["type"]
+        elif "literal" in source_spec:
+            inferred_type = "literal"
+        elif "url" in source_spec:
+            inferred_type = "url"
+
         # Handle embedded literal source - needs to be zipped and base64 encoded
-        if source_spec.get("type") == "literal" and "literal" in source_spec:
+        if inferred_type == "literal" and "literal" in source_spec:
             literal_code = source_spec["literal"]
 
             # Create a temporary directory and zip file
@@ -229,7 +260,7 @@ def generate_package(name, namespace, labels, package_spec, env_name, env_namesp
                 # Calculate checksum
                 sha256_hash = hashlib.sha256(zip_bytes).hexdigest()
 
-            # Set the source with base64 encoded zip
+            # Set the source with base64 encoded zip (type defaults to literal, checksum type defaults to sha256)
             package["spec"]["source"] = {
                 "type": "literal",
                 "literal": encoded,
@@ -239,8 +270,20 @@ def generate_package(name, namespace, labels, package_spec, env_name, env_namesp
                 }
             }
         else:
-            # URL source - copy as-is
-            package["spec"]["source"] = copy.deepcopy(package_spec["source"])
+            # URL source - copy and normalize
+            source_copy = copy.deepcopy(source_spec)
+
+            # Infer type if not present
+            if "type" not in source_copy:
+                source_copy["type"] = inferred_type or "url"
+
+            # Default checksum type to sha256 if not present
+            if "checksum" in source_copy and isinstance(source_copy["checksum"], dict):
+                if "type" not in source_copy["checksum"]:
+                    source_copy["checksum"]["type"] = "sha256"
+            
+
+            package["spec"]["source"] = source_copy
 
     # Add buildcmd if present
     if buildcmd:
@@ -357,8 +400,17 @@ def generate_http_trigger(name, namespace, labels, function_name, service_name, 
     Returns:
         HTTPTrigger resource dict
     """
-    # Default path to /<service>/<function> if not provided
-    path = trigger_spec.get("path", f"/{service_name}/{short_function_name}")
+    # Determine default path:
+    # - If path is explicitly given in trigger spec, use that (takes precedence)
+    # - If function name equals service name, use /<service-name>
+    # - Otherwise use /<service-name>/<function-name>
+    if "path" in trigger_spec:
+        path = trigger_spec["path"]
+    elif short_function_name == service_name:
+        path = f"/{service_name}"
+    else:
+        path = f"/{service_name}/{short_function_name}"
+
     method = trigger_spec.get("method", "GET")
     host = trigger_spec.get("host", "")
 

@@ -17,10 +17,8 @@ spec:
     - '*.py'
     - requirements.txt
     source:
-      type: url
       url: https://storage.googleapis.com/your-functions-bucket/api-v1.zip
       checksum:
-        type: sha256
         sum: "0000000000000000000000000000000000000000000000000000000000000000"
     buildcmd: ./build.sh
   environment:

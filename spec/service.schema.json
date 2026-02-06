@@ -4,21 +4,32 @@
   "title": "Fission Service",
   "description": "Declarative Service resource that generates Fission Package, Functions, and HTTPTriggers",
   "type": "object",
-  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
   "properties": {
     "apiVersion": {
       "type": "string",
-      "enum": ["serverless.krm.kubed.io/v1"],
+      "enum": [
+        "serverless.krm.kubed.io/v1"
+      ],
       "description": "API version for the Service resource"
     },
     "kind": {
       "type": "string",
-      "enum": ["Service"],
+      "enum": [
+        "Service"
+      ],
       "description": "Resource type"
     },
     "metadata": {
       "type": "object",
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -54,12 +65,18 @@
     },
     "spec": {
       "type": "object",
-      "required": ["package", "environment", "functions"],
+      "required": [
+        "package",
+        "environment",
+        "functions"
+      ],
       "properties": {
         "package": {
           "type": "object",
           "description": "Package specification",
-          "required": ["source"],
+          "required": [
+            "source"
+          ],
           "properties": {
             "name": {
               "type": "string",
@@ -71,17 +88,22 @@
               "items": {
                 "type": "string"
               },
-              "default": ["*.py"]
+              "default": [
+                "*.py"
+              ]
             },
             "source": {
               "type": "object",
               "description": "Package source location",
-              "required": ["type"],
+              "required": [],
               "properties": {
                 "type": {
                   "type": "string",
-                  "enum": ["url", "literal"],
-                  "description": "Source type: 'url' for GCS, 'literal' for embedded code"
+                  "enum": [
+                    "url",
+                    "literal"
+                  ],
+                  "description": "Source type (optional, inferred from 'url' or 'literal' key if not specified)"
                 },
                 "url": {
                   "type": "string",
@@ -95,12 +117,16 @@
                 "checksum": {
                   "type": "object",
                   "description": "Package checksum (for type: url)",
-                  "required": ["type", "sum"],
+                  "required": [
+                    "sum"
+                  ],
                   "properties": {
                     "type": {
                       "type": "string",
-                      "enum": ["sha256"],
-                      "description": "Checksum algorithm"
+                      "enum": [
+                        "sha256"
+                      ],
+                      "description": "Checksum algorithm (optional, defaults to 'sha256')"
                     },
                     "sum": {
                       "type": "string",
@@ -120,7 +146,9 @@
         "environment": {
           "type": "object",
           "description": "Fission environment specification",
-          "required": ["name"],
+          "required": [
+            "name"
+          ],
           "properties": {
             "name": {
               "type": "string",
@@ -198,6 +226,10 @@
               "items": {
                 "$ref": "#/definitions/trigger"
               }
+            },
+            "name": {
+              "type": "string",
+              "description": "Function name (optional, defaults to service name if only one function; required when multiple functions exist)"
             }
           }
         },
@@ -207,11 +239,13 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["name", "functionName"],
+            "required": [
+              "functionName"
+            ],
             "properties": {
               "name": {
                 "type": "string",
-                "description": "Function name (short, kebab-case)",
+                "description": "Function name (optional, defaults to service name if only one function; required if multiple functions)",
                 "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
               },
               "functionName": {
@@ -292,22 +326,32 @@
     "invokeStrategy": {
       "type": "object",
       "description": "Function invocation strategy",
-      "required": ["StrategyType"],
+      "required": [
+        "StrategyType"
+      ],
       "properties": {
         "StrategyType": {
           "type": "string",
-          "enum": ["execution", "newdeploy"],
+          "enum": [
+            "execution",
+            "newdeploy"
+          ],
           "description": "Strategy type (poolmgr or newdeploy)",
           "default": "execution"
         },
         "ExecutionStrategy": {
           "type": "object",
           "description": "Execution strategy configuration",
-          "required": ["ExecutorType"],
+          "required": [
+            "ExecutorType"
+          ],
           "properties": {
             "ExecutorType": {
               "type": "string",
-              "enum": ["poolmgr", "newdeploy"],
+              "enum": [
+                "poolmgr",
+                "newdeploy"
+              ],
               "description": "Executor type",
               "default": "poolmgr"
             },
@@ -363,9 +407,27 @@
         }
       }
     },
+    "secretReference": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Secret name"
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Secret namespace"
+        }
+      }
+    },
     "configMapReference": {
       "type": "object",
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -387,7 +449,15 @@
           "properties": {
             "method": {
               "type": "string",
-              "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+              "enum": [
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE",
+                "PATCH",
+                "HEAD",
+                "OPTIONS"
+              ],
               "description": "HTTP method",
               "default": "GET"
             },

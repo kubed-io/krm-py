@@ -17,7 +17,6 @@ spec:
     - utils.py
     - config.json
     source:
-      type: literal
       literal: |
         from flask import request, jsonify
         from utils import add, subtract, multiply, divide
