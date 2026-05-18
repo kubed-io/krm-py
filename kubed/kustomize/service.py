@@ -5,6 +5,7 @@ Generates Fission Package, Functions, and HTTPTriggers from a declarative Servic
 
 from kubed.krm import common as c
 import copy
+import re
 from kubed.krm.errors import plugin_fail
 import zipfile
 import tempfile
@@ -167,16 +168,26 @@ def transform(krm: dict) -> dict:
             # No triggers at all
             triggers = []
 
-        # Generate HTTPTrigger resources
+        # Generate HTTPTrigger resources. When a function has more than one
+        # trigger, derive a unique name per trigger from its path so all
+        # HTTPTrigger resources have distinct metadata.name values.
         for trigger in triggers:
+            trigger_spec = trigger.get("http", {})
+            if len(triggers) > 1:
+                path_slug = re.sub(r"[^a-z0-9]+", "-", trigger_spec.get("path", "").lower()).strip("-")
+                method_slug = trigger_spec.get("method", "GET").lower()
+                trigger_name = f"{func_name}-{method_slug}-{path_slug}" if path_slug else f"{func_name}-{method_slug}"
+            else:
+                trigger_name = func_name
+
             http_trigger = generate_http_trigger(
-                name=func_name,
+                name=trigger_name,
                 namespace=namespace,
                 labels=labels,
                 function_name=func_name,
                 service_name=service_name,
                 short_function_name=short_name,
-                trigger_spec=trigger.get("http", {})
+                trigger_spec=trigger_spec,
             )
             krm["items"].append(http_trigger)
 
