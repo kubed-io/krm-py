@@ -3,11 +3,13 @@
 
 Commands:
   pack      Package source files into a zip archive
-  publish   Publish package to GCS and update service.yaml
+  publish   Publish package to Fission storagesvc and update service.yaml
 """
 
 import sys
 import os
+import socket
+import time
 import zipfile
 import hashlib
 import subprocess
@@ -16,6 +18,11 @@ from pathlib import Path
 import yaml
 from datetime import datetime
 import fnmatch
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 
 def pack(service_file, output=None, quiet=False):
@@ -136,12 +143,74 @@ def pack(service_file, output=None, quiet=False):
     return str(output_path), checksum
 
 
-def publish(service_file, bucket=None):
-    """Publish package to GCS and update service.yaml
+STORAGESVC_IN_CLUSTER = 'http://storagesvc.flow'
+STORAGESVC_NAMESPACE = 'flow'
+STORAGESVC_PORT_FORWARD_LOCAL = 17731
+
+
+def _storagesvc_reachable(url):
+    """Check if storagesvc is reachable at the given base URL."""
+    try:
+        host = url.replace('http://', '').split(':')[0]
+        port = int(url.split(':')[-1]) if ':' in url.replace('http://', '') else 80
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2)
+        sock.connect((host, port))
+        sock.close()
+        return True
+    except (socket.timeout, socket.error, OSError):
+        return False
+
+
+def _upload_to_storagesvc(zip_path):
+    """Upload a zip to storagesvc. Returns the in-cluster source URL.
+
+    Tries the in-cluster URL first; falls back to kubectl port-forward
+    when running outside the cluster.
+    """
+    if requests is None:
+        print("Error: 'requests' library is required. Run: pip install requests", file=sys.stderr)
+        sys.exit(1)
+
+    pf_proc = None
+    upload_base = STORAGESVC_IN_CLUSTER
+
+    if not _storagesvc_reachable(STORAGESVC_IN_CLUSTER):
+        local = f'http://localhost:{STORAGESVC_PORT_FORWARD_LOCAL}'
+        print(f"storagesvc not reachable in-cluster, starting port-forward on :{STORAGESVC_PORT_FORWARD_LOCAL}...")
+        pf_proc = subprocess.Popen(
+            ['kubectl', 'port-forward', 'svc/storagesvc',
+             f'{STORAGESVC_PORT_FORWARD_LOCAL}:80', '-n', STORAGESVC_NAMESPACE],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        time.sleep(2)
+        upload_base = local
+
+    try:
+        file_size = Path(zip_path).stat().st_size
+        with open(zip_path, 'rb') as f:
+            resp = requests.post(
+                f'{upload_base}/v1/archive',
+                headers={'X-File-Size': str(file_size)},
+                files={'uploadfile': (Path(zip_path).name, f, 'application/zip')},
+                timeout=60,
+            )
+        resp.raise_for_status()
+        archive_id = resp.json()['id']
+    finally:
+        if pf_proc:
+            pf_proc.terminate()
+
+    # Always return the in-cluster URL — Fission fetches from inside the cluster
+    return f'{STORAGESVC_IN_CLUSTER}/v1/archive?id={archive_id}'
+
+
+def publish(service_file):
+    """Publish package to Fission storagesvc and update service.yaml
 
     Args:
         service_file: Path to service.yaml file
-        bucket: Optional GCS bucket name (defaults to $FX_BUCKET or kellyferrone-functions)
     """
     service_path = Path(service_file).resolve()
 
@@ -172,23 +241,10 @@ def publish(service_file, bucket=None):
     # Pack the files
     zip_path, checksum = pack(service_file, output=None)
 
-    # Upload to GCS
-    bucket_name = bucket or os.environ.get('FX_BUCKET', 'kellyferrone-functions')
-    archive_name = Path(zip_path).name
-    gcs_path = f"gs://{bucket_name}/{archive_name}"
-    public_url = f"https://storage.googleapis.com/{bucket_name}/{archive_name}"
-
-    print(f"\nUploading to {gcs_path}...")
-    result = subprocess.run(['gsutil', 'cp', zip_path, gcs_path], capture_output=True)
-    if result.returncode != 0:
-        print(f"Error uploading to GCS: {result.stderr.decode()}", file=sys.stderr)
-        sys.exit(1)
-
-    # Make it publicly readable
-    print("Setting public read permissions...")
-    result = subprocess.run(['gsutil', 'acl', 'ch', '-u', 'AllUsers:R', gcs_path], capture_output=True)
-    if result.returncode != 0:
-        print(f"Warning: Could not set public ACL: {result.stderr.decode()}", file=sys.stderr)
+    # Upload to storagesvc
+    print(f"\nUploading to storagesvc...")
+    source_url = _upload_to_storagesvc(zip_path)
+    print(f"Stored at: {source_url}")
 
     # Update service.yaml
     print(f"Updating {service_path.name}...")
@@ -198,7 +254,7 @@ def publish(service_file, bucket=None):
         spec['package']['source'] = {}
 
     spec['package']['source']['type'] = 'url'
-    spec['package']['source']['url'] = public_url
+    spec['package']['source']['url'] = source_url
 
     if 'checksum' not in spec['package']['source']:
         spec['package']['source']['checksum'] = {}
@@ -216,7 +272,7 @@ def publish(service_file, bucket=None):
 
     print("\n=== Publish Complete ===")
     print(f"Package: {package_name}")
-    print(f"Archive: {public_url}")
+    print(f"Archive: {source_url}")
     print(f"Checksum: {checksum}")
     print(f"\nRun 'kubectl up {source_dir}' to deploy.")
 
@@ -235,9 +291,8 @@ def main():
     pack_parser.add_argument('-o', '--out', help='Output zip file path (default: <package-name>-<timestamp>.zip in /tmp)')
 
     # publish subcommand
-    publish_parser = subparsers.add_parser('publish', help='Publish package to GCS and update service.yaml')
+    publish_parser = subparsers.add_parser('publish', help='Publish package to Fission storagesvc and update service.yaml')
     publish_parser.add_argument('service_file', help='Path to service.yaml file')
-    publish_parser.add_argument('-b', '--bucket', help='GCS bucket name (default: $FX_BUCKET or kellyferrone-functions)')
 
     args = parser.parse_args()
 
@@ -248,7 +303,7 @@ def main():
     if args.command == 'pack':
         pack(args.service_file, output=args.out)
     elif args.command == 'publish':
-        publish(args.service_file, bucket=args.bucket)
+        publish(args.service_file)
 
 
 if __name__ == '__main__':
