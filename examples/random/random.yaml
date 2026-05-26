@@ -1,0 +1,28 @@
+apiVersion: krm.kubed.io
+kind: Random
+metadata:
+  name: job-name-from-image
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: kubectl-kubed
+spec:
+  type: string
+  length: 8
+  upper: false
+  special: false
+  # When the image (or any keeper value) changes, the random token changes.
+  # When the image stays the same, the token stays the same — so Kustomize
+  # produces a stable Job name, and a new Job only runs when something
+  # meaningful upstream actually changed.
+  keepers:
+  - kind: Deployment
+    name: web
+    fieldPath: /spec/template/spec/containers/0/image
+  targets:
+  - kind: Job
+    name: web-migrate-.*
+    fieldPath: /metadata/name
+    options:
+      delimiter: '-'
+      index: 2

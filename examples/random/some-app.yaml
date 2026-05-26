@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  template:
+    spec:
+      containers:
+      - name: web
+        image: nginx:1.27.0
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: web-migrate-PLACEHOLDER
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: migrate
+        image: nginx:1.27.0
+        command: [/bin/true]

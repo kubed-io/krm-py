@@ -1,0 +1,202 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://krm.kubed.io/v1/random.schema.json",
+  "title": "Random",
+  "description": "KRM transformer that generates a random string or number and writes it into matched target fields. When keepers are configured, the output is deterministically seeded by the keeper field values — like Terraform's random_string keepers attribute.",
+  "type": "object",
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": [
+        "krm.kubed.io"
+      ],
+      "description": "API version for the Random resource"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "Random"
+      ],
+      "description": "Resource type"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Random resource name",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Kubernetes namespace"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "properties": {
+            "config.kubernetes.io/function": {
+              "type": "string",
+              "description": "Kustomize function annotation (should be: exec:\\n  path: kubectl-kubed)"
+            }
+          }
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "number"
+          ],
+          "description": "Value type to generate",
+          "default": "string"
+        },
+        "length": {
+          "type": "integer",
+          "description": "Length of the generated string (type: string only)",
+          "minimum": 1,
+          "default": 8
+        },
+        "lower": {
+          "type": "boolean",
+          "description": "Include lowercase letters in the pool (type: string only)",
+          "default": true
+        },
+        "upper": {
+          "type": "boolean",
+          "description": "Include uppercase letters in the pool (type: string only)",
+          "default": true
+        },
+        "numeric": {
+          "type": "boolean",
+          "description": "Include digits in the pool (type: string only)",
+          "default": true
+        },
+        "special": {
+          "type": "boolean",
+          "description": "Include special characters in the pool (type: string only)",
+          "default": false
+        },
+        "override_special": {
+          "type": "string",
+          "description": "Custom special-character pool used when special is true (type: string only)"
+        },
+        "min": {
+          "type": "integer",
+          "description": "Inclusive lower bound for the random integer (type: number only)",
+          "default": 0
+        },
+        "max": {
+          "type": "integer",
+          "description": "Inclusive upper bound for the random integer (type: number only)",
+          "default": 999999
+        },
+        "keepers": {
+          "type": "array",
+          "description": "Target selectors whose field values seed the RNG. When set, the generated value is deterministic across runs — same keeper values produce the same output. Omit to get a fresh random value every run.",
+          "items": {
+            "$ref": "#/definitions/fieldSelector"
+          }
+        },
+        "targets": {
+          "type": "array",
+          "description": "Target selectors that receive the generated value at the given fieldPath.",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/definitions/fieldSelector"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "options": {
+                    "type": "object",
+                    "description": "Optional patch options. When delimiter is set, the existing field value is split on it and the slot at index is replaced — useful for stamping the token into one part of a name like my-job-<random>.",
+                    "properties": {
+                      "delimiter": {
+                        "type": "string",
+                        "description": "Character to split the existing field value on"
+                      },
+                      "index": {
+                        "type": "integer",
+                        "description": "Index within the split array to replace with the random value",
+                        "minimum": 0,
+                        "default": 0
+                      }
+                    },
+                    "required": [
+                      "delimiter"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "fieldSelector": {
+      "type": "object",
+      "description": "Selects resources by apiVersion/kind/name/labels/annotations and points at a JSON-pointer field path on the matched resource.",
+      "required": [
+        "fieldPath"
+      ],
+      "properties": {
+        "apiVersion": {
+          "type": "string",
+          "description": "Regex matched against the resource apiVersion"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Regex matched against the resource kind"
+        },
+        "name": {
+          "type": "string",
+          "description": "Regex matched against metadata.name"
+        },
+        "matchLabels": {
+          "type": "object",
+          "description": "Label selector — all entries must match",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "matchAnnotations": {
+          "type": "object",
+          "description": "Annotation selector — all entries must match",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "fieldPath": {
+          "type": "string",
+          "description": "JSON-pointer path within the matched resource (e.g. /metadata/name, /spec/template/spec/containers/0/image)",
+          "pattern": "^/.*"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: random-example
+  annotations:
+    kubernetes.io/title: Random Transformer Example
+    kubernetes.io/description: |
+      Demonstrates the Random KRM transformer.
+      The Job's name picks up a stable random token derived from the
+      Deployment's container image. Change the image and the Job name
+      changes — which is how you get a fresh Job to run on apply.
+resources:
+- some-app.yaml
+transformers:
+- random.yaml

@@ -109,6 +109,7 @@ embed = "kubed.kustomize.embed:transform"
 replicate = "kubed.kustomize.replicate:transform"
 lastpasssecret = "kubed.kustomize.lastpass:generate"
 filter = "kubed.kustomize.filter.__init__:transform"
+random = "kubed.kustomize.random:transform"
 
 [project.entry-points."serverless.krm.kubed.io"]
 service = "kubed.kustomize.service:transform"
