@@ -24,8 +24,19 @@ metadata:
 spec:
   type: string
   keepers:
+  # explicit fieldPaths on the keeper
   - kind: Deployment
-    fieldPath: /spec/template/spec/containers/0/image
+    fieldPaths:
+    - /spec/template/spec/containers/0/image
+  # inverted control: matched resources declare their own keeper paths via
+  # `random.krm.kubed.io/keepers.fieldpaths`. Random falls back to the
+  # annotation when the keeper has no explicit fieldPaths.
+  - kind: ExternalSecret
+    matchLabels:
+      app: drupal
+  # no fieldPaths and no annotation -> whole resource (annotations stripped)
+  - kind: ConfigMap
+    name: site-.*
   targets:
   - kind: Job
     fieldPath: /metadata/name

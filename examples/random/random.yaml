@@ -11,14 +11,18 @@ spec:
   length: 8
   upper: false
   special: false
-  # When the image (or any keeper value) changes, the random token changes.
-  # When the image stays the same, the token stays the same — so Kustomize
-  # produces a stable Job name, and a new Job only runs when something
-  # meaningful upstream actually changed.
   keepers:
+  # Explicit fieldPaths on the keeper — takes priority over any annotation.
   - kind: Deployment
     name: web
-    fieldPath: /spec/template/spec/containers/0/image
+    fieldPaths:
+    - /spec/template/spec/containers/0/image
+  # No fieldPaths here — Random falls back to each matched resource's
+  # `random.krm.kubed.io/keepers.fieldpaths` annotation. Components can opt
+  # their own resources into the seed without ever touching this file.
+  - kind: ConfigMap
+    matchLabels:
+      seeder: keep-me
   targets:
   - kind: Job
     name: web-migrate-.*

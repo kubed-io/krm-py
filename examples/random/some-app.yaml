@@ -2,12 +2,14 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
+  labels:
+    seeder: keep-me
 spec:
   template:
     spec:
       containers:
       - name: web
-        image: nginx:1.27.0
+        image: nginx:latest # 1.27.0
 ---
 apiVersion: batch/v1
 kind: Job
@@ -21,3 +23,36 @@ spec:
       - name: migrate
         image: nginx:1.27.0
         command: [/bin/true]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: site-default
+  labels:
+    seeder: keep-me
+  # Inverted control: this resource declares its own keeper fieldPaths.
+  # The Random selector picks the resource up (via label/name pattern) and
+  # consults this annotation when it has no explicit fieldPaths of its own.
+  annotations:
+    random.krm.kubed.io/keepers.fieldpaths: |
+      /data/config.yaml
+data:
+  config.yaml: |
+    region: us-east
+    flag: on
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: site-default-secrets
+  labels:
+    seeder: keep-me
+  annotations:
+    random.krm.kubed.io/keepers.fieldpaths: |
+      /data/big.yaml
+data:
+  big.yaml: |
+    a long
+    multi-line
+    body that might be quite large
+    in real workloads

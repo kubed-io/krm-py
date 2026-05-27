@@ -7,7 +7,7 @@ import operator
 from importlib.metadata import entry_points
 import importlib.resources as importlib_resources
 from . import files
-from .errors import plugin_fail
+from .errors import plugin_fail, FieldPathNotFound, KubedError
 
 def execute(fx: callable = None):
   """KRM Function Executor
@@ -45,8 +45,12 @@ def execute(fx: callable = None):
     fx = load_function(krm["functionConfig"])
   try:
     dump(fx(krm))
-  except Exception as e:
+  except KubedError as e:
+    # known, well-formed failure — its message is already user-facing
     plugin_fail(e)
+  except Exception as e:
+    # anything else is unhandled — prefix so it's obvious in the kustomize output
+    plugin_fail("unhandled {type}: {msg}".format(type=type(e).__name__, msg=e))
 
 def resolve(krm: dict) -> dict:
   """Resolve KRM Function
@@ -148,6 +152,36 @@ def new_resource_list_object(konfig, items = []):
     "items": items,
     "results": []
   }
+
+def add_result(krm: dict, message: str, severity: str = "info", resource: dict = None, field_path: str = None):
+  """Append a structured Result to the ResourceList.
+
+  The KRM spec defines ``results`` as the channel for observability messages
+  (info/warning/error) that orchestrators like kustomize surface back to the
+  user. Functions push entries here instead of writing to stderr so the
+  message is structured and can carry resource/field references.
+
+  Args:
+    krm: The KRM ResourceList being transformed.
+    message: Human-readable message.
+    severity: "info" (default), "warning", or "error".
+    resource: Optional resource the message applies to — populates ``resourceRef``.
+    field_path: Optional JSON path within ``resource`` — populates ``field``.
+  """
+  entry = {"message": message, "severity": severity}
+  if resource is not None:
+    meta = resource.get("metadata") or {}
+    ref = {
+      "apiVersion": resource.get("apiVersion", ""),
+      "kind": resource.get("kind", ""),
+      "name": meta.get("name", ""),
+    }
+    if meta.get("namespace"):
+      ref["namespace"] = meta["namespace"]
+    entry["resourceRef"] = ref
+  if field_path is not None:
+    entry["field"] = {"path": field_path}
+  krm.setdefault("results", []).append(entry)
 
 def new_list_object(name, items = []):
     return {
@@ -289,11 +323,11 @@ def deepGet(obj, path, default=_default_stub, separator='/'):
                         UnicodeEncodeError, ValueError):
                     pass
             else:
-                msg = "{obj} has no element at '{i}'".format(obj=obj, i=i)
-                raise LookupError(msg.encode('utf8'))
+                raise FieldPathNotFound(
+                    "no element at {i!r} (path {path!r})".format(i=i, path=path)
+                )
     except Exception:
         if _default_stub != default:
-            print("Found default stub")
             return default
         raise
     return obj

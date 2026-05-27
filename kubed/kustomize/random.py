@@ -9,6 +9,8 @@ keepers attribute, adapted to KRM.
 See: https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string
 """
 
+import copy
+import json
 import random
 import string
 
@@ -17,6 +19,12 @@ from kubed.krm import common as c
 
 DEFAULT_LENGTH = 8
 DEFAULT_SPECIAL = "!@#$%&*()-_=+[]{}<>:?"
+
+# Resources can opt in to being a keeper by declaring which of their own
+# fieldPaths matter. Inverted control: the random.yaml selector just needs
+# to match the resource; the resource brings its own list of paths along.
+KEEPER_FIELDPATHS_ANNOTATION = "random.krm.kubed.io/keepers.fieldpaths"
+
 
 
 def transform(krm: dict) -> dict:
@@ -32,35 +40,111 @@ def transform(krm: dict) -> dict:
     The transformed ResourceList with the random value patched into targets.
   """
   spec = krm["functionConfig"]["spec"]
-  seed = resolve_keepers(spec.get("keepers", []), krm["items"])
+  seed = resolve_keepers(krm)
   value = generate(spec, seed)
   krm["items"] = [apply_targets(spec, r, value) for r in krm["items"]]
   return krm
 
 
-def resolve_keepers(keepers: list, items: list):
+def resolve_keepers(krm: dict):
   """Resolve Keeper Values to a Seed
 
-  Walks each keeper target, looks up the field value on every matched item,
-  and joins them into a single string. That string seeds the RNG so the same
-  set of keeper values always yields the same random value. Returns ``None``
-  when no keepers are configured, meaning the output should be non-deterministic.
+  Walks each keeper, collects values from every matched item, and joins them
+  into a single string. That string seeds the RNG so the same set of keeper
+  values always yields the same random value. Returns ``None`` when no
+  keepers are configured, meaning the output should be non-deterministic.
+
+  Each keeper is a resource selector (``kind``/``name``/``matchLabels``/etc.)
+  plus an optional list of ``fieldPaths``. Per matched resource, paths are
+  resolved by fallback:
+
+  1. **Keeper-declared** ``fieldPaths`` on the selector — wins if present.
+  2. **Resource-declared** via the
+     ``random.krm.kubed.io/keepers.fieldpaths`` annotation (newline-separated
+     list). Lets a component opt its own resource into the seed without the
+     random.yaml needing to enumerate paths.
+  3. **Whole resource** — used when neither list is present.
+     ``metadata.annotations`` is stripped so annotation churn doesn't
+     re-roll.
+
+  When a matched resource carries the annotation AND the keeper also has
+  explicit ``fieldPaths``, a structured ``warning`` is appended to
+  ``krm.results`` noting that the explicit paths win.
+
+  Each value — scalar, nested object, or large string — is canonicalized to
+  a stable string. When a selector matches multiple resources, they're
+  sorted by ``kind/namespace/name`` so the seed doesn't depend on items
+  order.
 
   Args:
-    keepers: List of target selectors with a ``fieldPath`` to read.
-    items: The KRM items to read keeper values from.
+    krm: The KRM ResourceList. Reads keepers from
+      ``krm.functionConfig.spec.keepers``, items from ``krm.items``, and
+      appends any warnings to ``krm.results``.
 
   Returns:
     A seed string built from keeper values, or ``None`` for no keepers.
   """
+  keepers = krm["functionConfig"]["spec"].get("keepers", [])
   if not keepers:
     return None
+  items = krm["items"]
   parts = []
   for k in keepers:
-    for r in items:
-      if c.targeted(r, k):
-        parts.append(str(c.deepGet(r, k["fieldPath"], default="")))
+    keeper_paths = k.get("fieldPaths") or []
+    matches = sorted(
+      (r for r in items if c.targeted(r, k)),
+      key=_resource_sort_key,
+    )
+    for r in matches:
+      annotation_paths = _annotation_fieldpaths(r)
+      if keeper_paths and annotation_paths:
+        c.add_result(
+          krm,
+          "keeper fieldPaths take precedence over the {ann} annotation "
+          "on this resource".format(ann=KEEPER_FIELDPATHS_ANNOTATION),
+          severity="warning",
+          resource=r,
+        )
+      paths = keeper_paths or annotation_paths
+      if not paths:
+        parts.append(_canonicalize(r))
+        continue
+      for fp in paths:
+        parts.append(_canonicalize(c.deepGet(r, fp)))
   return "|".join(parts)
+
+
+def _annotation_fieldpaths(res: dict) -> list:
+  """Read fieldPaths the resource itself declares via the keepers annotation."""
+  raw = (res.get("metadata", {}).get("annotations") or {}).get(
+    KEEPER_FIELDPATHS_ANNOTATION
+  )
+  if not raw:
+    return []
+  return [line.strip() for line in raw.splitlines() if line.strip()]
+
+
+def _canonicalize(v) -> str:
+  """Canonical string for any keeper value — scalars, objects, whole resources.
+
+  JSON-dump with sorted keys (``default=str`` covers anything non-JSON-native),
+  so structurally equivalent dicts produce identical output regardless of
+  insertion order. If the value looks like a Kubernetes resource — a dict
+  with a ``metadata.annotations`` object — annotations are dropped first,
+  since annotation churn from kustomize/ESO/controllers is noise we never
+  want to re-roll on.
+  """
+  if (isinstance(v, dict)
+      and isinstance(v.get("metadata"), dict)
+      and isinstance(v["metadata"].get("annotations"), dict)):
+    v = copy.deepcopy(v)
+    v["metadata"].pop("annotations", None)
+  return json.dumps(v, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def _resource_sort_key(r: dict) -> tuple:
+  meta = r.get("metadata", {})
+  return (r.get("kind", ""), meta.get("namespace", ""), meta.get("name", ""))
 
 
 def generate(spec: dict, seed):

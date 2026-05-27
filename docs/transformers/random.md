@@ -33,8 +33,38 @@ values change.
 | `special`         | `false`     | include special characters                             |
 | `override_special`| punctuation | override the special-character pool                    |
 | `min` / `max`     | `0` / `999999` | bounds when `type: number`                          |
-| `keepers`         | `[]`        | target selectors with `fieldPath` to seed the RNG      |
-| `targets`         | `[]`        | target selectors with `fieldPath` and optional `options` |
+| `keepers`         | `[]`        | resource selectors that seed the RNG; `fieldPaths` is optional |
+| `targets`         | `[]`        | resource selectors with required `fieldPath` and optional `options` |
+
+### Keeper shapes
+
+Each keeper is a resource selector (`kind`/`name`/`apiVersion`/`matchLabels`/`matchAnnotations`) with an optional `fieldPaths` list. What gets fed into the seed depends on what's listed:
+
+- **One `fieldPaths` entry, scalar value** — used as-is (`/spec/template/spec/containers/0/image`).
+- **One `fieldPaths` entry, object value** — JSON-serialized with sorted keys so any nested change re-rolls (`/spec/target/template/data`).
+- **One `fieldPaths` entry, large string** — fed in directly; size doesn't matter (`/data/big.yaml` could be many KB).
+- **Multiple `fieldPaths` entries** — each path's value is appended to the seed in declared order. Use this to track a handful of specific fields on a resource without going whole-resource.
+- **No `fieldPaths`** — see the path-resolution fallback below.
+
+When a selector matches multiple resources, they're sorted by `kind/namespace/name` so the seed doesn't depend on items order.
+
+### Inverted control via annotation
+
+Path resolution is a fallback chain per matched resource:
+
+1. The keeper's own `fieldPaths` if any.
+2. Otherwise, the resource's own `random.krm.kubed.io/keepers.fieldpaths` annotation. The value is a newline-separated list of JSON-pointer paths.
+3. Otherwise, the entire resource (annotations stripped).
+
+The annotation lets a component opt its own resource into the seed without the `random.yaml` needing to enumerate paths. Drop in an optional component that introduces a new resource, annotate it, and the existing Random transformer picks up its fields automatically:
+
+```yaml
+metadata:
+  annotations:
+    random.krm.kubed.io/keepers.fieldpaths: |
+      /spec/data
+      /spec/foo/bar
+```
 
 `options` on a target:
 

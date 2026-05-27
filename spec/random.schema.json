@@ -114,9 +114,9 @@
         },
         "keepers": {
           "type": "array",
-          "description": "Target selectors whose field values seed the RNG. When set, the generated value is deterministic across runs — same keeper values produce the same output. Omit to get a fresh random value every run.",
+          "description": "Resource selectors whose values seed the RNG. When set, the generated value is deterministic across runs — same keeper values produce the same output. Omit to get a fresh random value every run. Path resolution is a fallback chain per matched resource: (1) the keeper's own fieldPaths if any, otherwise (2) the resource's own 'random.krm.kubed.io/keepers.fieldpaths' annotation (newline-separated paths), otherwise (3) the entire resource (metadata.annotations stripped so annotation churn doesn't re-roll). Values can be scalars, nested objects, or large strings — all canonicalized before going into the seed.",
           "items": {
-            "$ref": "#/definitions/fieldSelector"
+            "$ref": "#/definitions/keeperSelector"
           }
         },
         "targets": {
@@ -125,7 +125,7 @@
           "items": {
             "allOf": [
               {
-                "$ref": "#/definitions/fieldSelector"
+                "$ref": "#/definitions/targetSelector"
               },
               {
                 "type": "object",
@@ -158,12 +158,9 @@
     }
   },
   "definitions": {
-    "fieldSelector": {
+    "resourceSelector": {
       "type": "object",
-      "description": "Selects resources by apiVersion/kind/name/labels/annotations and points at a JSON-pointer field path on the matched resource.",
-      "required": [
-        "fieldPath"
-      ],
+      "description": "Selects resources by apiVersion/kind/name/labels/annotations.",
       "properties": {
         "apiVersion": {
           "type": "string",
@@ -190,13 +187,48 @@
           "additionalProperties": {
             "type": "string"
           }
-        },
-        "fieldPath": {
-          "type": "string",
-          "description": "JSON-pointer path within the matched resource (e.g. /metadata/name, /spec/template/spec/containers/0/image)",
-          "pattern": "^/.*"
         }
       }
+    },
+    "keeperSelector": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/resourceSelector"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "fieldPaths": {
+              "type": "array",
+              "description": "Optional list of JSON-pointer paths within the matched resource. Omit or leave empty to use the entire resource (with annotations stripped). Each entry's value may be a scalar, an object, or a large string; values are appended to the seed in declared order.",
+              "items": {
+                "type": "string",
+                "pattern": "^/.*"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "targetSelector": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/resourceSelector"
+        },
+        {
+          "type": "object",
+          "required": [
+            "fieldPath"
+          ],
+          "properties": {
+            "fieldPath": {
+              "type": "string",
+              "description": "JSON-pointer path within the matched resource where the random value is written (e.g. /metadata/name).",
+              "pattern": "^/.*"
+            }
+          }
+        }
+      ]
     }
   }
 }
