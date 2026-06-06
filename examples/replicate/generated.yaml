@@ -21,17 +21,17 @@ spec:
       type: ExternalName
   overrides:
   - patches:
-    # valueFrom.path: a JSON-pointer read straight off the item (any type)
+    # valueFrom.path: a JMESPath read straight off the item (any type)
     - op: replace
       path: /metadata/name
       valueFrom:
-        path: /name
+        path: name
     - op: add
       path: /spec/externalName
       valueFrom:
-        path: /url
+        path: url
     - op: replace
       path: /metadata/labels/pizza.kind~1stuffed
       valueFrom:
-        path: /name
+        path: name
   

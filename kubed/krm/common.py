@@ -3,6 +3,7 @@ import os
 import yaml
 import re
 import jsonpatch
+import jmespath
 import operator
 from importlib.metadata import entry_points
 import importlib.resources as importlib_resources
@@ -213,6 +214,15 @@ def apply_patches(target, patches):
   p = jsonpatch.JsonPatch(patches)
   return p.apply(target)
 
+def search(expression, data):
+  """Read a value from `data` with a JMESPath expression.
+
+  The read side (jmespath) paired with apply_patches' write side (jsonpatch):
+  jmespath queries the source, jsonpatch writes the result. `@` selects the whole
+  object; dotted/bracket syntax drills in (e.g. `members`, `spec.containers[0]`).
+  """
+  return jmespath.search(expression, data)
+
 def splice(current, value, delimiter, index=0):
   """Replace-at-index: write `value` into segment `index` of `current`.
 
@@ -227,6 +237,37 @@ def splice(current, value, delimiter, index=0):
     parts.append("")
   parts[index] = str(value)
   return delimiter.join(parts)
+
+def value_from(config, options, item, data):
+  """Resolve a patch value: jmespath to read, options to combine with the original.
+
+  config:  the `valueFrom` object — `{path: <jmespath>}` reads off `item`.
+  options: how the read value combines with `data` (the value already at the patch
+           target), selected by `strategy` (default `splice`):
+             - `splice` (default)    place the value into segment `index` of `data`
+                                     split on `delimiter` (a name suffix, etc.) —
+                                     the replace-at-index shared with random.
+             - `merge`               flat-merge the read value OVER `data` (keeps
+                                     existing keys, e.g. spec.baseDn; ignores
+                                     delimiter/index). The hook for list
+                                     merge-vs-replace semantics later.
+             - `replace`             overwrite with the read value.
+           (k8s patchStrategy naming.)
+  item:    the source the path reads from (the replication item).
+  data:    the value currently at the patch target (the original being patched).
+
+  read-source (`item`) and combine-target (`data`) are different objects, hence the
+  extra arg over a bare resolver.
+  """
+  value = search(config["path"], item)
+  if not options:
+    return value
+  strategy = options.get("strategy", "splice")   # default: splice (uses delimiter/index)
+  if strategy == "merge" and isinstance(value, dict) and isinstance(data, dict):
+    return {**data, **value}
+  if strategy == "splice" and "delimiter" in options:
+    return splice(data, value, options["delimiter"], options.get("index", 0))
+  return value
 
 def mergeMeta(res, plugin):
   if "name" not in res["metadata"]:
@@ -333,7 +374,7 @@ def deepGet(obj, path, default=_default_stub, separator='/'):
         1
 
     """
-    # split after first slash or char, 
+    # split after first slash or char,
     # this means the original string must always include an extra separator in the front
     attributes = path[1:].split(separator)
 

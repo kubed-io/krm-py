@@ -76,11 +76,16 @@ def replicate(konfig, res):
 def process_patch(patch, item, rep):
   """Resolve one override into a plain JSON Patch op.
 
-  - `valueFrom: /foo` (or `valueFrom: {path: /foo}`) reads that value off the
-    current `item` with `common.deepGet` — copies any type (e.g. a members list).
-  - `options: {delimiter, index}` splices the value into segment `index` of the
-    field's current value (`common.splice`) — the replace-at-index used by the
-    random transformer and kustomize replacements, for composing names etc.
+  - `valueFrom: {path: <jmespath>}` reads that value off the current `item`
+    (`common.search`) — copies any type (e.g. a members list); `@` is the whole
+    item. The object form (k8s `valueFrom` convention) leaves room for more
+    source types later.
+  - `options` (when present) combines the read value with the field's current
+    value via `common.value_from`, by `strategy` (default `splice`):
+    `{delimiter, index}` splices into a segment (replace-at-index, shared with the
+    random transformer); `{strategy: merge}` flat-merges over the current value
+    (keeps keys like spec.baseDn); `{strategy: replace}` overwrites. With no
+    `options`, the read value is used as-is.
   JSON-pointer to *read* (the item) and *write* (the resource via jsonpatch). A
   patch with a literal `value` (no valueFrom) passes through; `options` applies
   to either.
@@ -96,13 +101,8 @@ def process_patch(patch, item, rep):
   cpPatch = copy.deepcopy(patch)
   vf = patch.get("valueFrom")
   if vf is not None:
-    if isinstance(vf, str):          # shorthand: valueFrom: /foo == {path: /foo}
-      vf = {"path": vf}
-    cpPatch["value"] = copy.deepcopy(c.deepGet(item, vf["path"]))
-  options = patch.get("options")
-  if options and "delimiter" in options:
-    current = c.deepGet(rep, patch["path"], default="")
-    cpPatch["value"] = c.splice(current, cpPatch.get("value", ""), options["delimiter"], options.get("index", 0))
+    current = c.deepGet(rep, patch["path"], default="")   # the value already at the target
+    cpPatch["value"] = copy.deepcopy(c.value_from(vf, patch.get("options"), item, current))
   cpPatch.pop("valueFrom", None)
   cpPatch.pop("options", None)
   return cpPatch

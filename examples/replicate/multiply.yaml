@@ -20,7 +20,7 @@ spec:
     - op: replace
       path: /metadata/name
       valueFrom:
-        path: /region
+        path: region
       options:
         delimiter: "-"
         index: 1
@@ -28,7 +28,7 @@ spec:
     - op: add
       path: /metadata/labels/az
       valueFrom:
-        path: /region
+        path: region
   - target:
       name: foo-myapp-2-b
     patches:
