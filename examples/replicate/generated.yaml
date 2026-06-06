@@ -20,14 +20,18 @@ spec:
     spec:
       type: ExternalName
   overrides:
-  - patches: 
+  - patches:
+    # valueFrom.path: a JSON-pointer read straight off the item (any type)
     - op: replace
       path: /metadata/name
-      value: "{}-{item[name]}"
+      valueFrom:
+        path: /name
     - op: add
       path: /spec/externalName
-      value: "{item[url]}"
-    - op: replace 
+      valueFrom:
+        path: /url
+    - op: replace
       path: /metadata/labels/pizza.kind~1stuffed
-      value: "{}-{item[name]}"
+      valueFrom:
+        path: /name
   

@@ -14,15 +14,22 @@ spec:
     matchLabels:
       multiplied: "true"
   overrides:
-  - patches: 
-    - op: replace 
+  - patches:
+    # options: replace-at-index — splice the region into segment 1 of the name
+    # (foo-myapp -> foo-<region>), the same splice the random transformer uses
+    - op: replace
       path: /metadata/name
-      value: "{item[region]}-{status[iter]}"
-  - patches: 
+      valueFrom:
+        path: /region
+      options:
+        delimiter: "-"
+        index: 1
+  - patches:
     - op: add
       path: /metadata/labels/az
-      value: "{item[region]}-{status[i]}"
-  - target: 
+      valueFrom:
+        path: /region
+  - target:
       name: foo-myapp-2-b
     patches:
     - op: add

@@ -59,12 +59,12 @@ LatestRelease = "https://github.com/kubed-io/krm-py/releases"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "src --verbose --cov=src --cov-report term-missing"
+addopts = "--verbose"
 testpaths = [
-  "src/tests"
+  "tests"
 ]
 pythonpath = [
-  "src"
+  "."
 ]
 markers = [
   "integration: mark a test as an integration test",
@@ -74,16 +74,15 @@ markers = [
 [tool.coverage.run]
 omit = [
   "*_test.py",
-  "foo.py",
-  "src/tests/*",
+  "tests/*",
   "**/__*__.py"
 ]
 
 [tool.ruff]
 exclude = [
-  "**/*_test.py", 
+  "**/*_test.py",
   "**/test_*.py",
-  "src/tests/*"
+  "tests/*"
 ]
 
 [tool.setuptools_scm]

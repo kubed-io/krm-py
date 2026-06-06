@@ -15,18 +15,18 @@ def test_replicate_as_generator():
   assert len(r["items"]) == 2
   # the first one should be
   assert r["items"][0] == {
-    'apiVersion': 'v1', 
-    'kind': 'Service', 
+    'apiVersion': 'v1',
+    'kind': 'Service',
     'metadata': {
       'labels': {
-        'pizza.kind/stuffed': 'pineapple-foo',
+        'pizza.kind/stuffed': 'foo',
         'stuff.junk/garbage': 'stinky'
-      }, 
-      'name': 'domain-replicas-foo', 
+      },
+      'name': 'foo',
       'namespace': 'mastery'
-    }, 
+    },
     'spec': {
-      'type': 'ExternalName', 
+      'type': 'ExternalName',
       'externalName': 'google.com'
     }
   }

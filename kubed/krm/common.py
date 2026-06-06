@@ -9,6 +9,18 @@ import importlib.resources as importlib_resources
 from . import files
 from .errors import plugin_fail, FieldPathNotFound, KubedError
 
+class NoAliasDumper(yaml.SafeDumper):
+  """A SafeDumper that never emits YAML anchors/aliases.
+
+  KRM output must be alias-free: kustomize extracts and processes each item in
+  the ResourceList independently, so an anchor (&id) defined in one item with
+  its alias (*id) in another breaks with "unknown anchor". Shared object
+  references (e.g. a list copied from a functionConfig item into a generated
+  resource) are expanded inline instead of aliased.
+  """
+  def ignore_aliases(self, data):
+    return True
+
 def execute(fx: callable = None):
   """KRM Function Executor
 
@@ -100,10 +112,10 @@ def dump(krm: dict):
   annotations = krm["functionConfig"]["metadata"].get("annotations", {})
   if "config.kubernetes.io/function" in annotations:
     # print("Running krm function", file=sys.stderr)
-    yaml.safe_dump(krm, sys.stdout, default_flow_style=False);
+    yaml.dump(krm, sys.stdout, Dumper=NoAliasDumper, default_flow_style=False);
   else:
     # print("Running legacy plugin", file=sys.stderr)
-    yaml.safe_dump_all(krm["items"], sys.stdout, default_flow_style=False);
+    yaml.dump_all(krm["items"], sys.stdout, Dumper=NoAliasDumper, default_flow_style=False);
 
 def krm_init() -> dict:
   """KRM Initialization
@@ -139,7 +151,7 @@ def krm_init() -> dict:
     return new_resource_list_object(conf, res)
 
 def konfig(name: str) -> dict:
-  pkg = importlib_resources.files("konfig")
+  pkg = importlib_resources.files("kubed.konfig")
   lp = pkg / f"{name}.yaml"
   content = lp.read_text(encoding="utf-8")
   return yaml.safe_load(content)
@@ -200,6 +212,21 @@ def query(items, target):
 def apply_patches(target, patches):
   p = jsonpatch.JsonPatch(patches)
   return p.apply(target)
+
+def splice(current, value, delimiter, index=0):
+  """Replace-at-index: write `value` into segment `index` of `current`.
+
+  Splits the current field value on `delimiter`, pads with empty segments up to
+  `index`, sets that segment to `value`, and rejoins — i.e. writes a value into
+  part of a delimited field (a name suffix, a CIDR octet, …). Mirrors kustomize
+  `replacements` options.delimiter/index. Shared by the random + replicate
+  transformers.
+  """
+  parts = str(current).split(delimiter) if current else []
+  while len(parts) <= index:
+    parts.append("")
+  parts[index] = str(value)
+  return delimiter.join(parts)
 
 def mergeMeta(res, plugin):
   if "name" not in res["metadata"]:

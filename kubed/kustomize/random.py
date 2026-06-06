@@ -208,14 +208,8 @@ def patch_value(res: dict, target: dict, value) -> dict:
   options = target.get("options", {})
 
   if "delimiter" in options:
-    delim = options["delimiter"]
-    idx = options.get("index", 0)
     current = c.deepGet(res, fieldPath, default="")
-    parts = str(current).split(delim) if current else []
-    while len(parts) <= idx:
-      parts.append("")
-    parts[idx] = str(value)
-    final = delim.join(parts)
+    final = c.splice(current, value, options["delimiter"], options.get("index", 0))
   else:
     final = value
 

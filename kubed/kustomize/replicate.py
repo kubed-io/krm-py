@@ -66,33 +66,44 @@ def replicate(konfig, res):
     # the overrides make the differences between the replicas
     for ov in spec["overrides"]:
       if "target" not in ov or c.targeted(rep, ov["target"]):
-        patches = [process_patch(patch, item, rep, status) for patch in ov["patches"]]
+        patches = [process_patch(patch, item, rep) for patch in ov["patches"]]
         rep = c.apply_patches(rep, patches)
     outItems.append(rep)
     # inc the iteration
     status["idx"] += 1
   return c.new_list_object(baseName, outItems)
 
-def process_patch(patch, item, rep, status):
+def process_patch(patch, item, rep):
+  """Resolve one override into a plain JSON Patch op.
+
+  - `valueFrom: /foo` (or `valueFrom: {path: /foo}`) reads that value off the
+    current `item` with `common.deepGet` — copies any type (e.g. a members list).
+  - `options: {delimiter, index}` splices the value into segment `index` of the
+    field's current value (`common.splice`) — the replace-at-index used by the
+    random transformer and kustomize replacements, for composing names etc.
+  JSON-pointer to *read* (the item) and *write* (the resource via jsonpatch). A
+  patch with a literal `value` (no valueFrom) passes through; `options` applies
+  to either.
+
+  Args:
+    patch: A single override patch (op/path + value/valueFrom/options).
+    item: The current item from spec.items the value is read from.
+    rep: The replica being built (source of the field's current value).
+
+  Returns:
+    A copy of the patch with valueFrom/options resolved into a concrete value.
+  """
   cpPatch = copy.deepcopy(patch)
-
-  # resolve template value only if there is a string value key
-  if "value" in patch and type(patch["value"]) == str:
-      if patch["op"] == "add":
-        cpPatch["value"] = patch["value"].format(status=status, item=item)
-      elif patch["op"] == "replace":
-        v = c.deepGet(rep, patch["path"])
-        cpPatch["value"] = patch["value"].format(v, status=status, item=item)
+  vf = patch.get("valueFrom")
+  if vf is not None:
+    if isinstance(vf, str):          # shorthand: valueFrom: /foo == {path: /foo}
+      vf = {"path": vf}
+    cpPatch["value"] = copy.deepcopy(c.deepGet(item, vf["path"]))
+  options = patch.get("options")
+  if options and "delimiter" in options:
+    current = c.deepGet(rep, patch["path"], default="")
+    cpPatch["value"] = c.splice(current, cpPatch.get("value", ""), options["delimiter"], options.get("index", 0))
+  cpPatch.pop("valueFrom", None)
+  cpPatch.pop("options", None)
   return cpPatch
-
-def op_merge_resolve(patch, item):
-  if "valueFrom" in patch:
-    vf = patch["valueFrom"]
-    if "itemKey" in vf:
-      patch["value"] = item[vf["itemKey"]]
-  return {
-    "op": "replace",
-    "path": patch["path"],
-    "value": patch["value"]
-  }
 
