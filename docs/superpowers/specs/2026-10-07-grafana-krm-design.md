@@ -188,6 +188,8 @@ layout:
 
 ## `Panel`
 
+> **Superseded by Round 3:** the `GrafanaLibrary` function replaces this. Kept for the record until this spec is deleted.
+
 Input:
 
 ```yaml
@@ -272,6 +274,8 @@ and v1 renderings, 2026-10-07). They are checked panel by panel against the fixt
 the fixture comparison removes them from Grafana's v1 panels.
 
 ## `Dashboard`
+
+> **Superseded by Round 3:** the `GrafanaLibrary` function replaces this. Kept for the record until this spec is deleted.
 
 Input:
 
@@ -361,6 +365,8 @@ spec:
 
 ## `Folder`
 
+> **Superseded by Round 3:** the `GrafanaLibrary` function replaces this. Kept for the record until this spec is deleted.
+
 ```yaml
 apiVersion: grafana.krm.kubed.io/v1alpha1
 kind: Folder
@@ -435,7 +441,115 @@ Decided by Dr K on 2026-10-07, after the Redis dashboard built.
 2. **The example** (`examples/grafana`) uses both a variables file and listed variable resources.
 3. **The Redis dashboard's 19 variables move to `grafana/variables.yaml`,** embedded from `dashboard.yaml`, and the build still matches the live dashboard with zero differences.
 
+## Round 3: one function, `GrafanaLibrary`
+
+Decided by Dr K on 2026-10-07, once Redis was built from sources. This supersedes the
+`Panel`, `Dashboard` and `Folder` functions (D4, D7, D8 and D10). There is no backward
+compatibility, because this has a single user: those three entry points are removed.
+
+| # | Decision |
+|---|---|
+| R1 | One KRM function, `GrafanaLibrary`, listed under `transformers:`. It is the only resource with a function annotation. |
+| R2 | Every other `grafana.krm.kubed.io` kind is plain data under `resources:`: `Panel`, `Dashboard`, `DataQuery`, the variable kinds and the layout kinds. They mirror Grafana's kinds and add `Embed` and `Target`. |
+| R3 | The library's `panels` selector chooses the Panels that become library panels. Its `dashboards` selector chooses the Dashboards it builds. Both are `targeted()` selectors, so the author picks the label that admits a resource. |
+| R4 | Only resources whose `apiVersion` is `grafana.krm.kubed.io/...` are candidates. Operator kinds already in the list (a `GrafanaDashboard`, say) are finished and ignored. |
+| R5 | The library has one folder. `spec.folder.uid` names an existing folder; `spec.folder.title` (and an optional `parent`) makes the library create a `GrafanaFolder`. Everything it emits goes in that folder, so placement never conflicts. |
+| R6 | The library marks everything it used `config.kubernetes.io/local-config: "true"` and leaves it in the list; kustomize drops it. Nothing is pruned. |
+| R7 | A resource of ours that no library used keeps no `local-config`. It reaches the output, and `kubectl plan`/`up` fails on it because the cluster has no such kind. That failure is the guard. The function itself does not fail, because a later library in the same kustomization may still use the resource. |
+| R8 | One library emits many library panels and many dashboards. |
+
+### Shape
+
+```yaml
+apiVersion: grafana.krm.kubed.io/v1alpha1
+kind: GrafanaLibrary
+metadata:
+  name: redis
+  namespace: observe
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: kubectl-kubed
+spec:
+  folder:
+    uid: cfyzcbzldfg1sa
+  panels:
+    matchLabels:
+      grafana.kubed.io/library-panel: redis
+  dashboards:
+    matchLabels:
+      grafana.kubed.io/dashboard: redis
+```
+
+| Field | Meaning |
+|---|---|
+| `folder.uid` | an existing folder uid. With `title`, it is the uid of the folder the library creates. |
+| `folder.title` | create a `GrafanaFolder` with this title. Its uid is `folder.uid`, or else the library's `metadata.name`. |
+| `folder.parent` | the parent folder uid of a created folder |
+| `panels` | a selector for the `Panel`s that become library panels. `kind: Panel` is implied. Omitted, there are none. |
+| `dashboards` | a selector for the `Dashboard`s to build. `kind: Dashboard` is implied. Omitted, there are none. |
+| `instanceSelector`, `allowCrossNamespaceImport`, `resyncPeriod` | defaults for everything the library emits (`matchLabels: {app.kubernetes.io/name: grafana}`, `true`, `24h`) |
+
+### The data kinds
+
+- **`Panel`:** `spec` is a v2 panel element spec. There is no `library` field, because the library's selector decides.
+  - The library panel's uid is `metadata.name`.
+  - Its name is `spec.title`, or `metadata.name` when the title is empty. The annotation `grafana.krm.kubed.io/library-name` overrides it.
+- **`Dashboard`:** `spec` is a v2 dashboard spec, with optional explicit `elements`. There is no `folder` field, because the library places it. `resyncPeriod`, `suspend` and `patch` are optional per-dashboard overrides, removed from the spec and passed to its `GrafanaManifest`.
+- **`DataQuery`, variable and layout kinds:** reached by `Target` or `Embed`, exactly as before.
+
+### What the library does
+
+1. **Candidates** are the items whose `apiVersion` starts with `grafana.krm.kubed.io/`.
+2. **Library panels.** For each `Panel` the `panels` selector matches:
+   - resolve its nodes, with `base` set to its origin directory;
+   - convert it to the v1 model;
+   - emit a `GrafanaLibraryPanel` in the library's folder.
+3. **Dashboards.** For each `Dashboard` the `dashboards` selector matches, resolve its nodes, then fill `elements` by `ElementReference` name. The first match wins:
+   1. an explicit entry;
+   2. a library panel, either this library's or a `GrafanaLibraryPanel` already in the list (from an earlier library), becomes a `LibraryPanel` reference;
+   3. any other `Panel` of ours with that name is resolved and embedded;
+   4. otherwise `ElementNotFound`.
+
+   Then emit a `GrafanaManifest` with the folder annotation.
+4. **Folder:** with `folder.title`, emit the `GrafanaFolder`.
+5. **Mark as used:** add `local-config` to every resource of ours the library used. That means the selected panels and dashboards, the embedded panels, and every resource a `Target` matched while resolving.
+6. **Output metadata:** outputs take the library's `metadata.namespace`, because transformer output does not receive the kustomization's `namespace:`. They keep their source's labels and carry `grafana.krm.kubed.io/kind`.
+
+Transformers run in order, so a library listed later can reference an earlier library's panels by name.
+
+### In a kustomization
+
+```yaml
+buildMetadata:
+- originAnnotations
+resources:
+- panels/
+- variables/
+- dashboard.yaml
+transformers:
+- library.yaml
+```
+
+### Acceptance
+
+1. **The function and its tests.** `GrafanaLibrary` is the only `grafana.krm.kubed.io` entry point, and the `Panel`, `Dashboard` and `Folder` modules and entry points are gone. Tests cover:
+   - panel and dashboard selection;
+   - only our apiVersion being a candidate;
+   - an existing folder versus a created one;
+   - library versus embedded panels;
+   - an earlier library's panels referenced by name;
+   - `local-config` added to everything used;
+   - an unused resource left unmarked.
+2. **The example** uses one library.
+3. **Redis:**
+   - panels and the dashboard are plain resources plus one `library.yaml`;
+   - `variables/kustomization.yaml` no longer needs `commonAnnotations`, because the library marks what its `Target` uses;
+   - the build matches the live dashboard, apart from the description's trailing space.
+
 ## Using it in a kustomization
+
+> **Superseded by Round 3:** the `GrafanaLibrary` function replaces this. Kept for the record until this spec is deleted.
 
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
