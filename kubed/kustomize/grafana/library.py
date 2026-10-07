@@ -94,10 +94,11 @@ def references(layout) -> list:
 
 
 def elements(dashboard: str, explicit: dict, names: list, items: list, ours: list, used: set) -> dict:
-  """The v2 elements map: explicit entries as written; then by name a library panel (a reference)
-  or any other Panel of ours (embedded)."""
+  """The v2 elements map: explicit entries as written; then by name a built library panel or a
+  LibraryPanel of ours (both references), or any other Panel of ours (embedded)."""
   libraries = {i["metadata"]["name"]: i for i in items if i.get("kind") == "GrafanaLibraryPanel"}
   panels = {i["metadata"]["name"]: i for i in ours if i["kind"] == "Panel"}
+  refs = {i["metadata"]["name"]: i for i in ours if i["kind"] == "LibraryPanel"}
   out = copy.deepcopy(explicit)
   for n in names:
     if n in out:
@@ -107,14 +108,18 @@ def elements(dashboard: str, explicit: dict, names: list, items: list, ours: lis
       model = json.loads(lp["spec"]["json"])
       out[n] = {"kind": "LibraryPanel", "spec": {"title": model.get("title", ""),
                                                  "libraryPanel": {"uid": lp["spec"]["uid"], "name": model["name"]}}}
+    elif n in refs:
+      out[n] = {"kind": "LibraryPanel", "spec": nodes.resolve(copy.deepcopy(refs[n]["spec"]), nodes.base_of(refs[n]),
+                                                              items, used=used)}
+      used.add(("LibraryPanel", n))
     elif n in panels:
       p = panels[n]
       out[n] = {"kind": "Panel", "spec": nodes.resolve(copy.deepcopy(p["spec"]), nodes.base_of(p), items, used=used)}
       used.add(("Panel", n))
     else:
-      raise ElementNotFound(f"dashboard {dashboard}: element {n} is not in elements, and no Panel or "
+      raise ElementNotFound(f"dashboard {dashboard}: element {n} is not in elements, and no Panel, LibraryPanel or "
                             f"GrafanaLibraryPanel is named {n}; panels: {sorted(panels)}, "
-                            f"library panels: {sorted(libraries)}")
+                            f"library panels: {sorted(libraries) + sorted(refs)}")
   taken = {e["spec"]["id"] for e in out.values() if "id" in e.get("spec", {})}
   next_id = 1
   for n in names + [k for k in out if k not in names]:

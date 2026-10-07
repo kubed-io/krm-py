@@ -50,7 +50,8 @@ def resolve(value, base=".", items=None, key=None, seen=frozenset(), used=None):
     value: any spec tree.
     base: the directory relative Embed paths resolve against; None inside a remote base.
     items: the ResourceList items a Target selects from.
-    key: the dict key value sits under; nodes directly in `queries` wrap DataQuery results.
+    key: the dict key value sits under; nodes directly in `queries` wrap DataQuery results, and
+      nodes in an `elements` map spread into it, each value keyed by its metadata name.
     seen: files and resources already being resolved, to catch cycles.
     used: when given, collects (kind, name) of every resource a Target matched.
 
@@ -68,7 +69,17 @@ def resolve(value, base=".", items=None, key=None, seen=frozenset(), used=None):
   if isinstance(value, dict):
     if is_node(value):
       return _load(value, base, items, seen, False, used)[0][1]
-    return {k: resolve(v, base, items, k, seen, used) for k, v in value.items()}
+    out = {}
+    for k, v in value.items():
+      if key == "elements" and is_node(v):
+        # a node among the elements spreads: each value it brings in is keyed by its own name
+        for n, o in _load(v, base, items, seen, True, used):
+          if n in out or n in value:
+            raise (EmbedError if v["kind"] == "Embed" else TargetError)(f"elements: {n} is defined more than once")
+          out[n] = o
+      else:
+        out[k] = resolve(v, base, items, k, seen, used)
+    return out
   return value
 
 

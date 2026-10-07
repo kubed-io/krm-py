@@ -151,3 +151,29 @@ def test_a_query_field_takes_one_dataquery_unwrapped():
   items = [item("DataQuery", "mem", **QUERY)]
   pq = {"kind": "PanelQuery", "spec": {"refId": "A", "query": target(kind="DataQuery", name="mem$")}}
   assert nodes.resolve(pq, ".", items)["spec"]["query"] == {"kind": "DataQuery", **QUERY}
+
+
+def lp(name, uid=None, labels=None):
+  return item("LibraryPanel", name, labels, spec={"id": 1, "title": name, "libraryPanel": {"uid": uid or name, "name": name}})
+
+
+def test_a_target_in_elements_spreads_its_matches_keyed_by_name():
+  items = [lp("b", labels={"t": "x"}), lp("a", labels={"t": "x"}), lp("c")]
+  out = nodes.resolve({"elements": {"all": target(kind="LibraryPanel", matchLabels={"t": "x"}), "own": {"kind": "Panel"}}},
+                      items=items)
+  assert list(out["elements"]) == ["a", "b", "own"]
+  assert out["elements"]["a"] == {"kind": "LibraryPanel", "spec": items[1]["spec"]}
+
+
+def test_an_embed_in_elements_spreads_a_multi_document_file(tmp_path):
+  (tmp_path / "els.yaml").write_text(
+    "apiVersion: grafana.krm.kubed.io/v1alpha1\nkind: LibraryPanel\nmetadata:\n  name: one\nspec:\n  id: 1\n---\n"
+    "apiVersion: grafana.krm.kubed.io/v1alpha1\nkind: LibraryPanel\nmetadata:\n  name: two\nspec:\n  id: 2\n")
+  out = nodes.resolve({"elements": {"x": embed("els.yaml")}}, str(tmp_path))
+  assert out == {"elements": {"one": {"kind": "LibraryPanel", "spec": {"id": 1}},
+                              "two": {"kind": "LibraryPanel", "spec": {"id": 2}}}}
+
+
+def test_a_name_defined_twice_in_elements_fails():
+  with pytest.raises(TargetError, match="more than once"):
+    nodes.resolve({"elements": {"a": {"kind": "Panel"}, "all": target(kind="LibraryPanel")}}, items=[lp("a")])

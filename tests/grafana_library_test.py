@@ -244,3 +244,22 @@ def test_a_query_variable_takes_its_query_from_the_list():
   qv = {"kind": "QueryVariable", "spec": {"name": "pod", "query": {"kind": "Target", "spec": {"kind": "DataQuery", "name": "pods$"}}}}
   variables, _ = built_variables([qv], [dq])
   assert variables[0]["spec"]["query"] == QUERY
+
+
+def test_a_library_panel_resource_is_a_reference_element_found_by_name():
+  ref_panel = resource("LibraryPanel", "masthead", {"id": 5, "title": "App masthead",
+                                                    "libraryPanel": {"uid": "app-masthead", "name": "App masthead"}})
+  krm = run(lib(), [ref_panel, dashboard("redis", "masthead")])
+  els = outputs(krm, "GrafanaManifest")[0]["spec"]["template"]["spec"]["elements"]
+  assert els["masthead"] == {"kind": "LibraryPanel", "spec": ref_panel["spec"]}
+  assert local(krm) == ["masthead", "redis"]
+
+
+def test_elements_target_brings_in_library_panels_and_panels_together():
+  a = resource("LibraryPanel", "a", {"title": "A", "libraryPanel": {"uid": "a", "name": "A"}}, {"tab": "logs"})
+  b = resource("Panel", "b", panel_spec("B"), {"tab": "logs"})
+  d = dashboard("redis", "a", "b", elements={"logs": {"kind": "Target", "spec": {"matchLabels": {"tab": "logs"}}}})
+  krm = run(lib(), [a, b, d])
+  els = outputs(krm, "GrafanaManifest")[0]["spec"]["template"]["spec"]["elements"]
+  assert set(els) == {"a", "b"} and els["a"]["kind"] == "LibraryPanel" and els["b"]["kind"] == "Panel"
+  assert local(krm) == ["a", "b", "redis"]

@@ -24,12 +24,17 @@ List it under `transformers:`. Everything else is data under `resources:`:
 |---|---|---|
 | `Panel` | a v2 panel spec | a `GrafanaLibraryPanel` when the library selects it; otherwise embedded into the dashboards that name it |
 | `Dashboard` | a v2 dashboard spec whose layout names panels with `ElementReference` | a `GrafanaManifest` holding a `dashboard.grafana.app/v2` Dashboard, when the library selects it |
+| `LibraryPanel` | a v2 `LibraryPanel` element (`id`, `title`, `libraryPanel: {uid, name}`) for a library panel that already exists | a reference element, found by name like a `Panel` |
 | `DataQuery`, variables, layouts | v2 objects with `apiVersion` and `metadata` | pulled in by `Target` |
 
 Anywhere inside a spec, `kind: Embed` (`spec.file`) is replaced by a file's contents and
 `kind: Target` (a selector: `kind`, `name`, `matchLabels`) by resources from the list. A
 multi-document file or a selector with several matches expands in a list, so variables
 can come in groups; a file keeps its order, a `Target` sorts by name.
+
+Inside a dashboard's `elements`, an `Embed` or `Target` spreads: every `Panel` or `LibraryPanel`
+it brings in is keyed by its own `metadata.name`, so one entry can pull a whole file or a
+label's worth of elements. A name defined twice fails.
 
 The library marks everything it used `local-config`, so kustomize drops it. A resource of
 ours that no library used stays in the output, and `kubectl up` fails on it.
