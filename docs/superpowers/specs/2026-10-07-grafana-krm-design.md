@@ -399,6 +399,42 @@ Steps:
 Folders nest by selecting other folders: a parent `Folder` listed after its children
 places them.
 
+## Round 2: variables
+
+Decided by Dr K on 2026-10-07, after the Redis dashboard built.
+
+**Requirements:**
+- **An `Embed` in `variables` adds variables from a file.** A multi-document YAML file (documents separated by `---`) adds one variable per document, in file order. A single-document file adds one.
+- **A `Target` in `variables` adds every matching variable resource from the list,** or exactly one when its selector names one.
+- **A `QueryVariable`'s `spec.query` resolves too:** it may be an `Embed` or a `Target` that comes out as one `DataQuery`, the same as a panel query.
+- **Every v2 variable kind works this way** (`QueryVariable`, `ConstantVariable`, `CustomVariable`, `TextVariable`, `IntervalVariable`, `DatasourceVariable` and the rest), because resolution never inspects the kind.
+
+**Design.** No new mechanism is needed: node resolution already expands nodes in list positions and resolves them in single positions. This round makes variables an explicit, tested contract.
+- **A variable as a resource** is a v2 variable plus `apiVersion: grafana.krm.kubed.io/v1alpha1` and `metadata`. Listed under `resources:` it needs `config.kubernetes.io/local-config: "true"`. In a file that an `Embed` loads, it needs neither.
+
+  ```yaml
+  apiVersion: grafana.krm.kubed.io/v1alpha1
+  kind: ConstantVariable
+  metadata:
+    name: redis-k8s-selector
+    labels:
+      dashboard: redis
+    annotations:
+      config.kubernetes.io/local-config: "true"
+  spec:
+    name: k8s_selector
+    query: app.kubernetes.io/name=redis
+    hide: hideVariable
+  ```
+
+- **Order matters.** Grafana shows variables in list order, and a query variable can only use variables listed before it. An `Embed` keeps file order. A `Target` sorts by `metadata.name`, as everywhere else. When order matters, use an `Embed`, or name the resources so they sort into the order wanted.
+- **`Dashboard` runs as a transformer,** so its `Target`s always see the list.
+
+**Acceptance:**
+1. **Tests** cover: a multi-document file embedded into `variables`; a single-document one; a `Target` adding several variables and one adding one; and a `QueryVariable` whose `spec.query` is an `Embed` and one whose `spec.query` is a `Target`.
+2. **The example** (`examples/grafana`) uses both a variables file and listed variable resources.
+3. **The Redis dashboard's 18 variables move to `grafana/variables.yaml`,** embedded from `dashboard.yaml`, and the build still matches the live dashboard with zero differences.
+
 ## Using it in a kustomization
 
 ```yaml
