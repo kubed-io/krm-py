@@ -1,6 +1,7 @@
 # Grafana KRM: dashboards, panels and folders as kustomize resources
 
-Date: 2026-10-07. Status: approved in chat with Dr K, awaiting review of this document.
+Date: 2026-10-07. Status: implemented on the `grafana` branch; the Redis deploy waits for Dr K.
+This spec is deleted by the PR that completes this work; anything lasting moves to the docs.
 
 ## Problem
 
@@ -255,12 +256,13 @@ and v1 renderings, 2026-10-07). They are checked panel by panel against the fixt
 | v1 field | From | Omitted when |
 |---|---|---|
 | `type` | `vizConfig.group` | never |
-| `pluginVersion` | `vizConfig.version` | not set |
+| `pluginVersion` | `vizConfig.version`, even when it is `""` | the key is absent |
 | `title` | `title` | never (an empty title stays `""`) |
 | `description` | `description` | empty |
 | `links` | `links` | empty |
 | `transparent` | `transparent` | false or unset |
-| `fieldConfig`, `options` | `vizConfig.spec.fieldConfig`, `vizConfig.spec.options` | not set |
+| `fieldConfig` | `vizConfig.spec.fieldConfig`, without an empty `defaults` or `overrides` | both empty |
+| `options` | `vizConfig.spec.options` | not set |
 | `targets` | one per `PanelQuery`: `{datasource: {type: query.group, uid: query.datasource.name}, **query.spec, refId}`, plus `hide: true` only when the `PanelQuery` is hidden (the Redis fixtures have no hidden query, so this one rule is from the v1 schema, not observed) | never (`[]` when there are no queries) |
 | `datasource` | the shared `{type, uid}` when every target has the same one | no queries, or mixed datasources |
 | `transformations` | one per `{kind: Transformation, group, spec}`: `{id: group, **spec}` | empty |
@@ -354,7 +356,7 @@ spec:
 ```
 
 - The template's `metadata.name` (the dashboard uid) is the `Dashboard`'s `metadata.name` (D11).
-- `metadata.namespace` is copied from the `Dashboard` config when set, because transformer output does not receive the kustomization's `namespace:`.
+- `metadata.namespace` is copied from the `Dashboard` config when set, because transformer output does not receive the kustomization's `namespace:`. The same holds for a `Panel` or `Folder` run as a transformer, and for the kustomization's `labels:`.
 - The `grafana.app/folder` annotation is written only when a folder is known.
 
 ## `Folder`
@@ -453,14 +455,14 @@ Redis (`uid: redis`, folder `apps`, 42 KB) is the smallest app dashboard that us
 feature: rows, grids and tabs; 18 variables (one query, 17 constants that feed library
 panels); 13 library panels shared with every app dashboard; and 13 panels of its own.
 
-- **Where the sources live:** `kubed-io/redis/providers/grafana/dashboards/redis/`, included from `providers/grafana/kustomization.yaml`, which also gains `kubectl.kubernetes.io/server-side: "true"`.
+- **Where the sources live:** `kubed-io/redis/grafana/`, its own kustomization (`kubectl.kubernetes.io/server-side: "true"`, namespace `observe`), deployed with `kubectl up grafana`.
 - **Panels:** each of Redis's own 13 panels becomes a `Panel` and keeps its live `id`. Long Business Text or text strings move to sibling files through `Embed`.
 - **The 13 shared library panels stay explicit `elements` entries.** They are not in git yet, and moving them belongs to the grafana repo, not this work.
 - **Porting may be scripted.** A one-off script that splits the live v2 document into sources belongs in `stuff/` and is not committed.
 
 Acceptance:
 1. **The build matches the live dashboard.** With element keys mapped to panel ids on both sides, the built `GrafanaManifest` template spec equals the live v2 spec. A remaining difference is either a function bug, fixed in krm-py with a test that reproduces it, or a field Grafana fills in on save, which is reported to Dr K.
-2. **`kubectl plan providers/grafana` shows only the new `GrafanaManifest`,** plus server-side-apply ownership changes on the existing CRs. Dr K approves before `kubectl up`.
+2. **`kubectl plan grafana` shows only the new `GrafanaManifest`.** Dr K approves before `kubectl up`.
 3. **After `kubectl up`, the dashboard matches and renders.**
    - The `GrafanaManifest` status reports a successful apply to `observe/grafana`.
    - The live dashboard still matches the build.
@@ -475,7 +477,7 @@ Each step is outward-facing and waits for Dr K's yes:
 1. **The krm-py PR:** one PR from the `grafana` branch.
 2. **The release:** tag the next kubed-krm version after merge; `publish.yml` publishes to PyPI on the tag.
 3. **The runner:** bump `KUBED_KRM_VERSION` in `kubed-io/github/runners/krm/Dockerfile` (0.0.6 today).
-4. **GitOps:** a workflow in `kubed-io/redis` that runs `kubectl up providers/grafana` on the `krm` runner when `providers/grafana/**` changes on `main`. It authenticates the way `deploy.yml` does today (kluster-konnect).
+4. **GitOps:** a workflow in `kubed-io/redis` that runs `kubectl up grafana` on the `krm` runner when `grafana/**` changes on `main`. It authenticates the way `deploy.yml` does today (kluster-konnect).
 
 ## Notes for the implementer
 
