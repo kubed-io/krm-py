@@ -7,4 +7,4 @@ sphinx-gallery
 sphinx-panels
 sphinx-jsonschema
 sphinx-copybutton
-docutils == 0.16
+docutils == 0.23
