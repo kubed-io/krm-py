@@ -433,7 +433,7 @@ Decided by Dr K on 2026-10-07, after the Redis dashboard built.
 **Acceptance:**
 1. **Tests** cover: a multi-document file embedded into `variables`; a single-document one; a `Target` adding several variables and one adding one; and a `QueryVariable` whose `spec.query` is an `Embed` and one whose `spec.query` is a `Target`.
 2. **The example** (`examples/grafana`) uses both a variables file and listed variable resources.
-3. **The Redis dashboard's 18 variables move to `grafana/variables.yaml`,** embedded from `dashboard.yaml`, and the build still matches the live dashboard with zero differences.
+3. **The Redis dashboard's 19 variables move to `grafana/variables.yaml`,** embedded from `dashboard.yaml`, and the build still matches the live dashboard with zero differences.
 
 ## Using it in a kustomization
 
