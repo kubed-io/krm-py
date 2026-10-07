@@ -120,3 +120,8 @@ random = "kubed.kustomize.random:transform"
 
 [project.entry-points."serverless.krm.kubed.io"]
 service = "kubed.kustomize.service:transform"
+
+[project.entry-points."grafana.krm.kubed.io"]
+panel = "kubed.kustomize.grafana.panel:transform"
+dashboard = "kubed.kustomize.grafana.dashboard:transform"
+folder = "kubed.kustomize.grafana.folder:transform"

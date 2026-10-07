@@ -115,7 +115,7 @@ jobs:
         test -x /tmp/verify/bin/kubectl-kubed
         /tmp/verify/bin/python - <<'EOF'
         from importlib.metadata import entry_points
-        for group in ("krm.kubed.io", "serverless.krm.kubed.io"):
+        for group in ("krm.kubed.io", "serverless.krm.kubed.io", "grafana.krm.kubed.io"):
           names = sorted(entry_points(group=group).names)
           assert names, f"no entry points in {group}"
           print(group, names)
