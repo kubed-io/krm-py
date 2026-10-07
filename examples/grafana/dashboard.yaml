@@ -11,6 +11,15 @@ metadata:
         path: kubectl-kubed
 spec:
   title: KRM example
+  variables:
+  - kind: Embed
+    spec:
+      file: variables.yaml
+  - kind: Target
+    spec:
+      kind: ConstantVariable
+      matchLabels:
+        dashboard: krm-example
   layout:
     kind: RowsLayout
     spec:

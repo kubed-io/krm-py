@@ -172,3 +172,32 @@ spec:
                       "y": 0
               title: Overview
       title: KRM example
+      variables:
+      - kind: QueryVariable
+        spec:
+          label: Pod
+          name: pod
+          query:
+            datasource:
+              name: prometheus
+            group: prometheus
+            kind: DataQuery
+            spec:
+              query: label_values(up{namespace="observe"}, pod)
+            version: v0
+          refresh: onDashboardLoad
+      - kind: TextVariable
+        spec:
+          label: Filter
+          name: filter
+          query: ""
+      - kind: ConstantVariable
+        spec:
+          hide: hideVariable
+          name: namespace
+          query: observe
+      - kind: ConstantVariable
+        spec:
+          hide: hideVariable
+          name: k8s_selector
+          query: app.kubernetes.io/part-of=observe

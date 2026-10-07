@@ -20,6 +20,12 @@ replaced by a file's contents and `kind: Target` (a selector: `kind`, `name`,
 `matchLabels`) by resources from the list. `DataQuery` resources are plain data that
 panels pull in either way.
 
+Variables work the same way. An `Embed` in `variables` adds one variable per YAML
+document in the file, in file order; a `Target` adds every matching variable resource,
+sorted by name. A `QueryVariable`'s `spec.query` can be an `Embed` or `Target` of a
+`DataQuery`. Grafana keeps variables in list order, and a query variable can only use
+the ones before it, so reach for a file when order matters.
+
 - Set `buildMetadata: [originAnnotations]`, so `Embed` paths resolve next to the file
   they are written in.
 - Set `kubectl.kubernetes.io/server-side: "true"`; dashboards outgrow client-side

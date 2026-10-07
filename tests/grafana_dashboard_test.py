@@ -90,3 +90,74 @@ def test_rows_can_be_embedded_from_files(tmp_path):
   spec = out[-1]["spec"]["template"]["spec"]
   assert spec["layout"]["spec"]["rows"][0]["spec"]["title"] == "Overview"
   assert "memory" in spec["elements"]
+
+
+# Round 2: variables. Node resolution is generic; these pin the contract for the
+# variables list and a QueryVariable's query.
+
+QUERY = {"kind": "DataQuery", "group": "prometheus", "version": "v0", "datasource": {"name": "prom"},
+         "spec": {"query": "label_values(up, pod)"}}
+
+
+def const(name, value):
+  return {"kind": "ConstantVariable", "spec": {"name": name, "query": value, "hide": "hideVariable"}}
+
+
+def variable_resource(kind, name, spec, labels=None):
+  return {"apiVersion": "grafana.krm.kubed.io/v1alpha1", "kind": kind,
+          "metadata": {"name": name, "labels": labels or {"dashboard": "redis"},
+                       "annotations": {"config.kubernetes.io/local-config": "true"}}, "spec": spec}
+
+
+def built_variables(spec, items, tmp_path=None):
+  konfig = cfg({"title": "R", "layout": layout(), **spec})
+  if tmp_path:
+    konfig["metadata"]["annotations"]["config.kubernetes.io/origin"] = f"path: {tmp_path}/dashboard.yaml\n"
+  out = dashboard.transform(c.new_resource_list_object(konfig, items))["items"]
+  return out[-1]["spec"]["template"]["spec"]["variables"]
+
+
+def test_a_multi_document_file_adds_every_variable_in_file_order(tmp_path):
+  (tmp_path / "variables.yaml").write_text(
+    "kind: ConstantVariable\nspec:\n  name: b\n  query: '2'\n---\n"
+    "apiVersion: grafana.krm.kubed.io/v1alpha1\nkind: ConstantVariable\nmetadata:\n  name: a\nspec:\n  name: a\n  query: '1'\n")
+  variables = built_variables({"variables": [{"kind": "Embed", "spec": {"file": "variables.yaml"}}]}, [], tmp_path)
+  assert variables == [{"kind": "ConstantVariable", "spec": {"name": "b", "query": "2"}},
+                       {"kind": "ConstantVariable", "spec": {"name": "a", "query": "1"}}]
+
+
+def test_a_single_document_file_adds_one_variable_beside_inline_ones(tmp_path):
+  (tmp_path / "pod.yaml").write_text("kind: ConstantVariable\nspec:\n  name: pod\n  query: redis-0\n")
+  variables = built_variables({"variables": [const("first", "x"), {"kind": "Embed", "spec": {"file": "pod.yaml"}}]},
+                              [], tmp_path)
+  assert [v["spec"]["name"] for v in variables] == ["first", "pod"]
+
+
+def test_a_target_adds_every_matching_variable_sorted_by_name():
+  items = [variable_resource("ConstantVariable", "redis-b", const("b", "2")["spec"]),
+           variable_resource("ConstantVariable", "redis-a", const("a", "1")["spec"]),
+           variable_resource("ConstantVariable", "emby-a", const("e", "3")["spec"], {"dashboard": "emby"})]
+  variables = built_variables({"variables": [{"kind": "Target", "spec": {"matchLabels": {"dashboard": "redis"}}}]}, items)
+  assert variables == [const("a", "1"), const("b", "2")]
+
+
+def test_a_target_can_add_just_one_variable():
+  items = [variable_resource("ConstantVariable", "redis-a", const("a", "1")["spec"]),
+           variable_resource("ConstantVariable", "redis-b", const("b", "2")["spec"])]
+  variables = built_variables({"variables": [{"kind": "Target", "spec": {"name": "redis-b$"}}]}, items)
+  assert variables == [const("b", "2")]
+
+
+def test_a_query_variable_takes_its_query_from_a_file(tmp_path):
+  (tmp_path / "pods.yaml").write_text(
+    "apiVersion: grafana.krm.kubed.io/v1alpha1\nkind: DataQuery\nmetadata:\n  name: pods\n"
+    "group: prometheus\nversion: v0\ndatasource:\n  name: prom\nspec:\n  query: label_values(up, pod)\n")
+  qv = {"kind": "QueryVariable", "spec": {"name": "pod", "query": {"kind": "Embed", "spec": {"file": "pods.yaml"}}}}
+  assert built_variables({"variables": [qv]}, [], tmp_path)[0]["spec"]["query"] == QUERY
+
+
+def test_a_query_variable_takes_its_query_from_the_list():
+  dq = {"apiVersion": "grafana.krm.kubed.io/v1alpha1",
+        "metadata": {"name": "pods", "annotations": {"config.kubernetes.io/local-config": "true"}}, **QUERY}
+  qv = {"kind": "QueryVariable", "spec": {"name": "pod", "query": {"kind": "Target", "spec": {"kind": "DataQuery", "name": "pods$"}}}}
+  assert built_variables({"variables": [qv]}, [dq])[0]["spec"]["query"] == QUERY

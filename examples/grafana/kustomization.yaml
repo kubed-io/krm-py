@@ -9,6 +9,7 @@ buildMetadata:
 - originAnnotations
 resources:
 - queries.yaml
+- constants.yaml
 generators:
 - panels/up.yaml
 - panels/note.yaml
