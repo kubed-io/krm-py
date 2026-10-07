@@ -29,6 +29,10 @@ dependencies = [
   "kubernetes>=33.1.0"
 ]
 [project.optional-dependencies]
+test = [
+  "pytest",
+  "ruff",
+]
 build = [
   "invoke",
   "setuptools_scm",
@@ -79,11 +83,15 @@ omit = [
 ]
 
 [tool.ruff]
-exclude = [
-  "**/*_test.py",
-  "**/test_*.py",
-  "tests/*"
-]
+# The oldest interpreter supported, so ruff flags what would break there.
+target-version = "py310"
+# Sphinx's conf.py imports the package to prove autodoc can, not to use it.
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+# Ruff's classic defaults: real errors, not style. The code is 2-space indented
+# with long lines throughout, which the stricter sets would flag file by file.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.setuptools_scm]
 

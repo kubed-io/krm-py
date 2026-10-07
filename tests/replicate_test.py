@@ -1,4 +1,3 @@
-import pytest
 from kubed.krm import common as c, files as f
 
 def test_replicate_as_generator():
@@ -46,5 +45,5 @@ def test_running_with_target():
   assert res["items"][2]["kind"] == "List" # b/c Deployment was replicated
 
   # the example stated there should be specifically three deployments in the list
-  l = res["items"][2]
-  assert len(l["items"]) == 3
+  replicas = res["items"][2]
+  assert len(replicas["items"]) == 3

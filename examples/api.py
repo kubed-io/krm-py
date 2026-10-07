@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 
 # this: https://python-jsonschema.readthedocs.io/en/stable/faq/#why-doesn-t-my-schema-s-default-property-set-the-default-on-my-instance
-import json
-import jsonschema
-from jsonschema import validate, Draft7Validator, validators
+from jsonschema import Draft7Validator, validators
 
 # A sample schema
 schema = {

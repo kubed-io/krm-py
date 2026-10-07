@@ -113,10 +113,10 @@ def dump(krm: dict):
   annotations = krm["functionConfig"]["metadata"].get("annotations", {})
   if "config.kubernetes.io/function" in annotations:
     # print("Running krm function", file=sys.stderr)
-    yaml.dump(krm, sys.stdout, Dumper=NoAliasDumper, default_flow_style=False);
+    yaml.dump(krm, sys.stdout, Dumper=NoAliasDumper, default_flow_style=False)
   else:
     # print("Running legacy plugin", file=sys.stderr)
-    yaml.dump_all(krm["items"], sys.stdout, Dumper=NoAliasDumper, default_flow_style=False);
+    yaml.dump_all(krm["items"], sys.stdout, Dumper=NoAliasDumper, default_flow_style=False)
 
 def krm_init() -> dict:
   """KRM Initialization
@@ -303,7 +303,7 @@ def targeted(res, target):
 
   # match by label selector
   if "matchLabels" in target:
-    if not "labels" in res["metadata"]:
+    if "labels" not in res["metadata"]:
       return False
     labels = dict(res["metadata"]["labels"])
     if not dict(labels, **target["matchLabels"]) == labels:
@@ -311,7 +311,7 @@ def targeted(res, target):
 
   # match by annotations selector
   if "matchAnnotations" in target:
-    if not "annotations" in res["metadata"]:
+    if "annotations" not in res["metadata"]:
       return False
     annotations = dict(res["metadata"]["annotations"])
     if not dict(annotations, **target["matchAnnotations"]) == annotations:
