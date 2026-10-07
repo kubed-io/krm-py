@@ -1,0 +1,141 @@
+name: 🛡️ Quality
+
+# The static-analysis and audit gates, kept out of test.yml so a red here names
+# the thing that is wrong instead of burying it in a test run. Four independent
+# jobs, all fast, all parallel:
+#
+#   CodeQL            the code scanner — Python source AND the workflows here
+#   Dependency Audit  pip-audit over the resolved RUNTIME dependency set
+#   Workflow Audit    zizmor over .github — CI supply chain and token hygiene
+#   Dockerfile Lint   hadolint over the images this repo publishes
+#
+# Runs on pull requests and on pushes to main, so the badge tracks trunk and a
+# direct push is gated the same way a PR is.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  # `actions` is in the language list on purpose: the release path handles a
+  # GitHub App key, Docker Hub credentials and a PyPI identity, so the workflows
+  # are as much attack surface as the Python is.
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Publish findings to Security → Code scanning, and onto the PR.
+      security-events: write
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+
+    # Both languages are interpreted, so there is nothing to build. No
+    # `build-mode: none`: the action only accepts it for a single language.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v4
+      with:
+        languages: python,actions
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v4
+
+  # Known-vulnerability audit of what a `pip install kubed-krm` actually pulls.
+  deps:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        # setuptools_scm resolves the version from history at install time.
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Setup Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.14'
+        cache: pip
+        cache-dependency-path: pyproject.toml
+
+    # Runtime only: an advisory against a test-only tool that stops a release
+    # is noise, not security.
+    - name: Install Runtime Dependencies
+      run: pip install --editable .
+
+    # --exclude-editable drops kubed-krm itself, so the audit covers what it
+    # depends on rather than racing its own unreleased version on PyPI.
+    - name: Freeze Runtime Dependencies
+      run: pip freeze --exclude-editable > requirements.txt
+
+    - name: Audit Dependencies
+      uses: pypa/gh-action-pip-audit@v1.1.0
+      with:
+        inputs: requirements.txt
+        summary: true
+
+    - name: Upload Resolved Dependencies
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: requirements-lock
+        path: requirements.txt
+        if-no-files-found: error
+
+  # zizmor audits the CI itself. Config and the reasoning behind each
+  # relaxation live in .github/zizmor.yml.
+  actions:
+    name: Workflow Audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+
+    # A pull request from a FORK gets a read-only token, so the SARIF upload
+    # would 403. zizmor's own exit code is the gate either way.
+    - name: Audit Workflows
+      uses: zizmorcore/zizmor-action@v0.6.4
+      with:
+        inputs: .github/
+        persona: regular
+        advanced-security: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+
+  # Exclusions and their reasons live in .hadolint.yaml.
+  docker:
+    name: Dockerfile Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+
+    - name: Lint Dockerfile
+      uses: hadolint/hadolint-action@v3.5.0
+      with:
+        dockerfile: Dockerfile
+        failure-threshold: warning

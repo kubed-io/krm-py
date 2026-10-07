@@ -1,91 +1,236 @@
-name: 📦 Publish
+name: 🧬 Publish Version
+
+# Manual, intentional release. Each job owns one thing, ordered so nothing
+# outward-facing happens until every artifact it refers to exists:
+#
+#   test    → the full 3.10 → 3.14 matrix; gates everything below
+#   version → roll CHANGELOG [Unreleased], commit + tag on main. The ONLY job
+#             that writes a file or a tag; it emits the tag used downstream.
+#   image   → check out that tag and push kubed/krm-py:<tag>
+#   package → check out that tag and build the sdist + wheel → GHA artifact
+#   pypi    → upload that artifact to PyPI
+#   release → attach the same artifact to the GitHub Release
+#
+# PyPI uses trusted publishing, which PyPI binds to THIS file name and the
+# `pypi` environment — so the upload is a job here, never inside a called
+# workflow, and renaming this file breaks publishing until PyPI is updated.
+#
+# Run once with push=false (a dry run: tests, the next version, and both builds,
+# nothing pushed), then push=true. A failed build after a successful tag strands
+# a tag on an image that never existed, which is what the dry run buys.
+#
+# Auth for the version job: tokenless WIF → GCP Secret Manager → the kubed.io
+# GitHub App creds, which let version-bump commit and tag on main.
 
 on:
-  push:
-    tags:
-    - 'v*'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Version to bump to
+        default: patch
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+        - premajor
+        - preminor
+        - prepatch
+      push:
+        description: Push changes and create release
+        default: false
+        type: boolean
 
 permissions:
-  id-token: write
+  contents: read
 
 jobs:
 
+  test:
+    name: Test
+    uses: ./.github/workflows/test.yml
+
+  version:
+    name: Version
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # commit the rolled CHANGELOG and push the tag to main
+      id-token: write   # GCP workload-identity federation, for the App token
+    # No release-notes output: GitHub drops a job output that contains a
+    # registered secret's substring (`kubed-io` is in every PR link), silently.
+    # The notes travel as an artifact instead.
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+
+    - name: Validate Branch
+      if: inputs.push
+      env:
+        REF: ${{ github.ref_name }}
+      run: |
+        if [[ "$REF" != "main" ]]; then
+          echo "::error::Releases can only be pushed from main. Current ref: $REF"
+          exit 1
+        fi
+
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v3
+      with:
+        workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+        service_account: github@${{ vars.GCP_PROJECT }}.iam.gserviceaccount.com
+
+    # github-app = kubed.io app creds (JSON: github_app_client_id /
+    # github_app_private_key) pushed by apps/github/providers/gcp.
+    - name: Get secrets
+      id: secrets
+      uses: google-github-actions/get-secretmanager-secrets@v3
+      with:
+        secrets: |-
+          github_app:${{ vars.GCP_PROJECT }}/github-app
+
+    - name: Mint kubed.io app token
+      id: app-token
+      uses: actions/create-github-app-token@v3
+      with:
+        client-id: ${{ fromJson(steps.secrets.outputs.github_app).github_app_client_id }}
+        private-key: ${{ fromJson(steps.secrets.outputs.github_app).github_app_private_key }}
+        permission-contents: write
+
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        token: ${{ steps.app-token.outputs.token }}
+
+    - name: Bump Version
+      id: bump
+      uses: duplocloud/version-bump@main
+      with:
+        version: ${{ inputs.action }}
+        push: ${{ inputs.push }}
+        token: ${{ steps.app-token.outputs.token }}
+
+    # Empty notes are a hard failure: they ARE the release, and an empty body
+    # sails through a green run unnoticed.
+    - name: Save the Release Notes
+      env:
+        NOTES: ${{ steps.bump.outputs.release-notes }}
+      run: |
+        mkdir -p notes
+        printf '%s\n' "$NOTES" > notes/release-notes.md
+        if [[ ! -s notes/release-notes.md || -z "$(tr -d '[:space:]' < notes/release-notes.md)" ]]; then
+          echo "::error::The release notes came back empty, so this fails rather than publishing a release without them."
+          exit 1
+        fi
+        echo "Release notes: $(wc -l < notes/release-notes.md) lines." >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload the Release Notes
+      uses: actions/upload-artifact@v7
+      with:
+        name: release-notes
+        path: notes/release-notes.md
+        retention-days: 1
+
+  # On a dry run there is no tag, so it builds the current ref without pushing.
+  image:
+    name: Publish Image
+    needs: version
+    # A called workflow cannot hold a permission its caller did not grant.
+    permissions:
+      contents: read
+      id-token: write   # GCP workload-identity federation, for the registry creds
+    uses: ./.github/workflows/image.yml
+    with:
+      tag: ${{ inputs.push && needs.version.outputs.tag || '' }}
+      push: ${{ inputs.push }}
+
   package:
     name: Package
+    needs: version
+    uses: ./.github/workflows/package.yml
+    with:
+      tag: ${{ inputs.push && needs.version.outputs.tag || '' }}
+
+  pypi:
+    name: PyPI
+    needs: package
+    if: inputs.push
     runs-on: ubuntu-latest
-    environment: 
+    environment:
       name: pypi
       url: https://pypi.org/project/kubed-krm
+    permissions:
+      contents: read
+      id-token: write   # PyPI trusted publishing
     steps:
 
-    - name: Checkout Code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Download Package
+      uses: actions/download-artifact@v8
       with:
-        cache: pip
+        name: ${{ needs.package.outputs.package }}
+        path: dist
 
-    - name: Install Dependencies
-      run: pip install '.[build]'
-
-    - name: Check True Version
-      id: check_version
-      run: |
-        version=$(python -m setuptools_scm)
-        package="kubed_krm-${version}"
-        echo "Building Version: $version"
-        echo "version=$version" >> $GITHUB_OUTPUT
-        echo "package=$package" >> $GITHUB_OUTPUT
-    
-    - name: Run the Build
-      run: python -m build
-
-    - name: Show Files
-      run: ls -l dist
-
-    - name: Github Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ steps.check_version.outputs.package }}
-        path: dist/*.tar.gz
-        
-    - name: Publish Package to PyPI
+    - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-    
-  image:
-    name: Image
+
+  release:
+    name: Release
+    needs:
+    - version
+    - image
+    - package
+    - pypi
+    if: inputs.push
     runs-on: ubuntu-latest
-    environment: 
-      name: dockerhub
-      url: https://hub.docker.com/r/kubed/krm-py
+    permissions:
+      contents: write   # create the GitHub Release on the existing tag
     steps:
 
-    - name: Checkout Code
-      uses: actions/checkout@v4
+    - name: Download Package
+      uses: actions/download-artifact@v8
+      with:
+        name: ${{ needs.package.outputs.package }}
+        path: dist
 
-    - name: Setup QEMU
-      id: setup-qemu
-      uses: docker/setup-qemu-action@v3
+    - name: Download the Release Notes
+      uses: actions/download-artifact@v8
+      with:
+        name: release-notes
+        path: notes
 
-    - name: Set up Docker Buildx
-      id: buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Set Image Args
+    - name: Compose the Release Body
+      env:
+        SERVER: ${{ github.server_url }}
+        REPO: ${{ github.repository }}
+        RUN_ID: ${{ github.run_id }}
+        TAG: ${{ needs.version.outputs.tag }}
+        VERSION: ${{ needs.package.outputs.version }}
       run: |
         {
-          echo "GIT_REF=$(echo ${GITHUB_REF##*/} | sed -e 's/\//_/g')";
-          echo "GIT_SHA=$(git rev-parse --short HEAD)";
-          echo "PY_VERSION=$(cat .python-version)";
-        } >> $GITHUB_ENV
-      
-    - name: Login to DockerHub
-      id: login-dockerhub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+          echo "[![Publish](${SERVER}/${REPO}/actions/workflows/publish.yml/badge.svg)](${SERVER}/${REPO}/actions/runs/${RUN_ID})"
+          echo "[![Test](${SERVER}/${REPO}/actions/workflows/test.yml/badge.svg)](${SERVER}/${REPO}/actions/workflows/test.yml)"
+          echo "[![Quality](${SERVER}/${REPO}/actions/workflows/quality.yml/badge.svg)](${SERVER}/${REPO}/actions/workflows/quality.yml)"
+          echo
+          cat notes/release-notes.md
+          echo
+          echo "## Install"
+          echo
+          echo '```sh'
+          echo "pip install kubed-krm==${VERSION}"
+          echo "docker pull kubed/krm-py:${TAG}"
+          echo '```'
+        } > body.md
+        cat body.md >> "$GITHUB_STEP_SUMMARY"
 
-    - name: Build and Push
-      run: docker buildx bake --push
+    - name: Create Release
+      uses: softprops/action-gh-release@v3.0.3
+      with:
+        name: ${{ needs.version.outputs.tag }}
+        tag_name: ${{ needs.version.outputs.tag }}
+        prerelease: ${{ contains(needs.version.outputs.tag, '-') }}
+        body_path: body.md
+        files: |
+          dist/${{ needs.package.outputs.sdist }}
+          dist/${{ needs.package.outputs.wheel }}
