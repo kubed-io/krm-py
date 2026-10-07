@@ -7,13 +7,13 @@ metadata:
 namespace: observe
 buildMetadata:
 - originAnnotations
+# all plain grafana.krm.kubed.io data; the library decides what becomes what
 resources:
 - queries.yaml
 - constants.yaml
-generators:
 - panels/up.yaml
 - panels/note.yaml
-transformers:
 - panels/cpu.yaml
 - dashboard.yaml
-- folder.yaml
+transformers:
+- library.yaml

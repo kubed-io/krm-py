@@ -3,10 +3,6 @@ apiVersion: grafana.krm.kubed.io/v1alpha1
 kind: Panel
 metadata:
   name: up
-  annotations:
-    config.kubernetes.io/function: |
-      exec:
-        path: kubectl-kubed
 spec:
   title: Targets up
   data:

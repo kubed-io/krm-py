@@ -43,7 +43,7 @@ def is_node(v) -> bool:
   return isinstance(v, dict) and v.get("kind") in NODES and isinstance(v.get("spec"), dict)
 
 
-def resolve(value, base=".", items=None, key=None, seen=frozenset()):
+def resolve(value, base=".", items=None, key=None, seen=frozenset(), used=None):
   """Replace every Embed and Target node in value.
 
   Args:
@@ -52,6 +52,7 @@ def resolve(value, base=".", items=None, key=None, seen=frozenset()):
     items: the ResourceList items a Target selects from.
     key: the dict key value sits under; nodes directly in `queries` wrap DataQuery results.
     seen: files and resources already being resolved, to catch cycles.
+    used: when given, collects (kind, name) of every resource a Target matched.
 
   Returns:
     value with every node replaced.
@@ -60,26 +61,26 @@ def resolve(value, base=".", items=None, key=None, seen=frozenset()):
     out = []
     for v in value:
       if is_node(v):
-        out.extend(_wrap(n, o) if key == "queries" else o for n, o in _load(v, base, items, seen, True))
+        out.extend(_wrap(n, o) if key == "queries" else o for n, o in _load(v, base, items, seen, True, used))
       else:
-        out.append(resolve(v, base, items, None, seen))
+        out.append(resolve(v, base, items, None, seen, used))
     return out
   if isinstance(value, dict):
     if is_node(value):
-      return _load(value, base, items, seen, False)[0][1]
-    return {k: resolve(v, base, items, k, seen) for k, v in value.items()}
+      return _load(value, base, items, seen, False, used)[0][1]
+    return {k: resolve(v, base, items, k, seen, used) for k, v in value.items()}
   return value
 
 
-def _load(node, base, items, seen, many):
+def _load(node, base, items, seen, many, used=None):
   """A node's values as (name, value) pairs, each already resolved."""
   spec = node["spec"]
   if node["kind"] == "Embed":
     error, what = EmbedError, "Embed " + str(spec.get("file"))
-    found = _embed(spec, base, items, seen)
+    found = _embed(spec, base, items, seen, used)
   else:
     error, what = TargetError, "Target " + json.dumps(spec, sort_keys=True)
-    found = _target(spec, items, seen)
+    found = _target(spec, items, seen, used)
   if not found:
     raise error(f"{what}: resolved to nothing")
   if not many and len(found) != 1:
@@ -87,7 +88,7 @@ def _load(node, base, items, seen, many):
   return found
 
 
-def _embed(spec, base, items, seen):
+def _embed(spec, base, items, seen, used=None):
   file = spec["file"]
   if base is None:
     raise EmbedError(f"Embed {file}: not supported inside a remote base")
@@ -115,13 +116,13 @@ def _embed(spec, base, items, seen):
       inner = os.path.dirname(p) or "."
       for d in docs:
         name = d.get("metadata", {}).get("name", stem) if isinstance(d, dict) else stem
-        out.append((name, resolve(strip(d), inner, items, None, seen | {p})))
+        out.append((name, resolve(strip(d), inner, items, None, seen | {p}, used)))
     else:
       out.append((stem, text))
   return out
 
 
-def _target(spec, items, seen):
+def _target(spec, items, seen, used=None):
   if not items:
     raise TargetError(f"Target {json.dumps(spec, sort_keys=True)}: there is no resource list to select from; "
                       "a Panel needs to be under transformers: for list references")
@@ -130,7 +131,9 @@ def _target(spec, items, seen):
     ref = f"{m['kind']}/{m['metadata']['name']}"
     if ref in seen:
       raise TargetError(f"Target {json.dumps(spec, sort_keys=True)}: cycle through {ref}")
-    out.append((m["metadata"]["name"], resolve(strip(copy.deepcopy(m)), base_of(m), items, None, seen | {ref})))
+    if used is not None:
+      used.add((m["kind"], m["metadata"]["name"]))
+    out.append((m["metadata"]["name"], resolve(strip(copy.deepcopy(m)), base_of(m), items, None, seen | {ref}, used)))
   return out
 
 

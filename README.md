@@ -51,6 +51,7 @@ See [`examples/random`](examples/random/) and
 ## Grafana
 
 Panels, dashboards and folders as kustomize resources (`grafana.krm.kubed.io`), deployed
-through grafana-operator. Write a panel as a v2 panel spec; `Embed` pulls files in and
-`Target` pulls resources from the list. See [`examples/grafana`](examples/grafana/) and
+through grafana-operator. Panels and dashboards are plain v2 data; one `GrafanaLibrary`
+transformer selects which become library panels and dashboards, in its folder. `Embed`
+pulls files in and `Target` pulls resources from the list. See [`examples/grafana`](examples/grafana/) and
 [`docs/generators/grafana.md`](docs/generators/grafana.md).

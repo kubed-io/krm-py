@@ -3,13 +3,13 @@ kind: GrafanaFolder
 metadata:
   annotations:
     config.kubernetes.io/origin: |
-      configuredIn: folder.yaml
+      configuredIn: library.yaml
       configuredBy:
         apiVersion: grafana.krm.kubed.io/v1alpha1
-        kind: Folder
+        kind: GrafanaLibrary
         name: krm-examples
         namespace: observe
-    grafana.krm.kubed.io/kind: Folder
+    grafana.krm.kubed.io/kind: GrafanaLibrary
   name: krm-examples
   namespace: observe
 spec:
@@ -25,17 +25,20 @@ kind: GrafanaLibraryPanel
 metadata:
   annotations:
     config.kubernetes.io/origin: |
-      configuredIn: panels/cpu.yaml
+      configuredIn: library.yaml
       configuredBy:
         apiVersion: grafana.krm.kubed.io/v1alpha1
-        kind: Panel
-        name: example-cpu
+        kind: GrafanaLibrary
+        name: krm-examples
         namespace: observe
     grafana.krm.kubed.io/kind: Panel
+  labels:
+    grafana.kubed.io/library-panel: krm-example
   name: example-cpu
   namespace: observe
 spec:
   allowCrossNamespaceImport: true
+  folderUID: krm-examples
   instanceSelector:
     matchLabels:
       app.kubernetes.io/name: grafana
@@ -48,15 +51,15 @@ kind: GrafanaManifest
 metadata:
   annotations:
     config.kubernetes.io/origin: |
-      configuredIn: dashboard.yaml
+      configuredIn: library.yaml
       configuredBy:
         apiVersion: grafana.krm.kubed.io/v1alpha1
-        kind: Dashboard
-        name: krm-example
+        kind: GrafanaLibrary
+        name: krm-examples
         namespace: observe
     grafana.krm.kubed.io/kind: Dashboard
   labels:
-    grafana.kubed.io/folder: krm-examples
+    grafana.kubed.io/dashboard: krm-example
   name: krm-example
   namespace: observe
 spec:

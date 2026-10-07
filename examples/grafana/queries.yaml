@@ -4,8 +4,6 @@ metadata:
   name: cpu
   labels:
     panel: cpu
-  annotations:
-    config.kubernetes.io/local-config: "true"
 group: prometheus
 version: v0
 datasource:

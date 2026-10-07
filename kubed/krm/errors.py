@@ -34,3 +34,7 @@ class ElementNotFound(KubedError):
 
 class ConversionError(KubedError):
   """A v2 panel could not be converted to the v1 panel model."""
+
+
+class LibraryError(KubedError):
+  """A GrafanaLibrary's own configuration is incomplete."""

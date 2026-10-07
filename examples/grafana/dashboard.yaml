@@ -2,13 +2,8 @@ apiVersion: grafana.krm.kubed.io/v1alpha1
 kind: Dashboard
 metadata:
   name: krm-example
-  namespace: observe
   labels:
-    grafana.kubed.io/folder: krm-examples
-  annotations:
-    config.kubernetes.io/function: |
-      exec:
-        path: kubectl-kubed
+    grafana.kubed.io/dashboard: krm-example
 spec:
   title: KRM example
   variables:

@@ -122,6 +122,4 @@ random = "kubed.kustomize.random:transform"
 service = "kubed.kustomize.service:transform"
 
 [project.entry-points."grafana.krm.kubed.io"]
-panel = "kubed.kustomize.grafana.panel:transform"
-dashboard = "kubed.kustomize.grafana.dashboard:transform"
-folder = "kubed.kustomize.grafana.folder:transform"
+grafanalibrary = "kubed.kustomize.grafana.library:transform"
