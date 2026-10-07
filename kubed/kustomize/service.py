@@ -3,7 +3,6 @@
 Generates Fission Package, Functions, and HTTPTriggers from a declarative Service resource.
 """
 
-from kubed.krm import common as c
 import copy
 import re
 from kubed.krm.errors import plugin_fail

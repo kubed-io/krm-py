@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: grafana-example
+  annotations:
+    kubectl.kubernetes.io/server-side: "true"
+namespace: observe
+buildMetadata:
+- originAnnotations
+# all plain grafana.krm.kubed.io data; the library decides what becomes what
+resources:
+- queries.yaml
+- constants.yaml
+- panels/up.yaml
+- panels/note.yaml
+- panels/cpu.yaml
+- dashboard.yaml
+transformers:
+- library.yaml

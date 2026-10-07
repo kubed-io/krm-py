@@ -1,4 +1,3 @@
-from . import common as c
 import yaml
 
 class KObject():

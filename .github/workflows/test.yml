@@ -1,0 +1,85 @@
+name: 🧪 Test
+
+# Lint and the test suite. The matrix is event-shaped:
+#
+#   pull_request     3.10 + 3.14 — the fast gate, at both ends of the range
+#   push: main       3.10 → 3.14 — the compatibility sweep, once the change has
+#                    landed and nobody is blocked on it
+#   workflow_call    full matrix too — publish.yml runs this before it cuts a
+#                    version, so a release never ships an interpreter it has not
+#                    been tested on
+#
+# pyproject declares requires-python >=3.10.
+
+on:
+  # No `paths` filter on pull_request, deliberately. This job is a REQUIRED
+  # status check, and a path-filtered required check never reports on a PR that
+  # misses the filter — GitHub then waits for it forever and the PR can never
+  # merge. The push filter below is fine: nothing gates on it.
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+    - kubed/**
+    - tests/**
+    - examples/**
+    - pyproject.toml
+    - .github/workflows/test.yml
+  workflow_dispatch:
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+jobs:
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      # On a main-branch sweep the useful answer is "which versions broke", not
+      # "the first one to".
+      fail-fast: false
+      matrix:
+        # Keep 3.14 last-listed and present in BOTH arms: `Test (3.14)` is the
+        # required status check, so it has to report on every pull request.
+        python-version: ${{ github.event_name == 'pull_request' && fromJSON('["3.10", "3.14"]') || fromJSON('["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        # setuptools_scm needs history to resolve a version at install time.
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Setup Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: pip
+        cache-dependency-path: pyproject.toml
+
+    - name: Install
+      run: pip install ".[test]"
+
+    # The example tests run real `kustomize build`s with exec functions; without
+    # kustomize they skip, and a skipped build test is a green PR that never
+    # proved its kustomization works. Same version as the devcontainer stage.
+    - name: Install Kustomize
+      env:
+        KUSTOMIZE_VERSION: v5.7.1
+      run: |
+        mkdir -p "$RUNNER_TEMP/bin"
+        curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" \
+          | tar -xz -C "$RUNNER_TEMP/bin" kustomize
+        echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+    - name: Lint
+      run: ruff check .
+
+    - name: Test
+      run: pytest

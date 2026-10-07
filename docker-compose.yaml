@@ -12,6 +12,7 @@ services:
       - kubed/krm-py:slim
       - kubed/krm-py:${GIT_SHA:-latest}
       - kubed/krm-py:${GIT_REF:-latest}
+      - kubed/krm-py:${GIT_TAG:-latest}
       - kubed/krm-py:py${PY_VERSION}
       - kubed/krm-py:${GIT_REF:-latest}-py${PY_VERSION}
       x-bake:

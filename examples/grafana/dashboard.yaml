@@ -1,0 +1,41 @@
+apiVersion: grafana.krm.kubed.io/v1alpha1
+kind: Dashboard
+metadata:
+  name: krm-example
+  labels:
+    grafana.kubed.io/dashboard: krm-example
+spec:
+  title: KRM example
+  variables:
+  - kind: Embed
+    spec:
+      file: variables.yaml
+  - kind: Target
+    spec:
+      kind: ConstantVariable
+      matchLabels:
+        dashboard: krm-example
+  layout:
+    kind: RowsLayout
+    spec:
+      rows:
+      - kind: RowsLayoutRow
+        spec:
+          title: ''
+          hideHeader: true
+          layout:
+            kind: GridLayout
+            spec:
+              items:
+              - kind: GridLayoutItem
+                spec:
+                  x: 0
+                  y: 0
+                  width: 24
+                  height: 3
+                  element:
+                    kind: ElementReference
+                    name: note
+      - kind: Embed
+        spec:
+          file: rows/overview.yaml

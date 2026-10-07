@@ -1,0 +1,23 @@
+# hadolint configuration — the Dockerfile linter run by quality.yml.
+#
+# quality.yml fails on `warning` and above, so an ignore here is a deliberate
+# decision to accept a rule's risk, not a way to quiet a nuisance. All three are
+# about version pinning, where the pin lives somewhere this linter cannot see or
+# would only make the build break on a schedule.
+ignored:
+
+# DL3013 — "pin versions in pip install". The package's own pins are in
+# pyproject.toml, which `setup` installs from; the one unpinned name is
+# `--upgrade pip` in the build stage, which never reaches a shipped image.
+- DL3013
+
+# DL3018 — "pin versions in apk add". python3, py3-pip and ncurses come from the
+# pinned kubed/krm base's Alpine branch; pinning point releases breaks the build
+# the day Alpine drops them, for a risk the base tag already bounds.
+- DL3018
+
+# DL3008 — "pin versions in apt-get install". Only the `dev` stage uses apt, and
+# that image is a local devcontainer, never pushed.
+- DL3008
+
+failure-threshold: warning

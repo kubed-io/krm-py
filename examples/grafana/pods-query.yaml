@@ -1,0 +1,10 @@
+apiVersion: grafana.krm.kubed.io/v1alpha1
+kind: DataQuery
+metadata:
+  name: pods
+group: prometheus
+version: v0
+datasource:
+  name: prometheus
+spec:
+  query: label_values(up{namespace="observe"}, pod)

@@ -1,0 +1,143 @@
+name: 🗿 Package
+
+# Builds the Python distribution (sdist + wheel) and nothing else, then saves it
+# as a GHA artifact. It never bumps versions, tags, or publishes anywhere:
+#
+#   pull_request       the gate — proves the wheel still builds and installs
+#   push: main         same, so the badge tracks trunk
+#   workflow_dispatch  package an arbitrary ref
+#   workflow_call      publish.yml passes the release tag, so the distribution is
+#                      built from exactly the released commit; its pypi and
+#                      release jobs upload this artifact, byte for byte
+#
+# The version is not an input: setuptools_scm derives it from git.
+
+on:
+  # No `paths` filter on pull_request: a path-filtered required check never
+  # reports on a PR that misses the filter, and that PR can never merge.
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+  workflow_call:
+    inputs:
+      tag:
+        description: Git tag to check out and build — empty = the caller's ref
+        type: string
+        required: false
+        default: ''
+    outputs:
+      version:
+        description: Version built, as setuptools_scm resolved it from git
+        value: ${{ jobs.package.outputs.version }}
+      package:
+        description: Name of the uploaded artifact holding the sdist + wheel
+        value: ${{ jobs.package.outputs.package }}
+      sdist:
+        description: sdist file name
+        value: ${{ jobs.package.outputs.sdist }}
+      wheel:
+        description: wheel file name
+        value: ${{ jobs.package.outputs.wheel }}
+
+permissions:
+  contents: read
+
+jobs:
+
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      package: ${{ steps.version.outputs.package }}
+      sdist: ${{ steps.files.outputs.sdist }}
+      wheel: ${{ steps.files.outputs.wheel }}
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ inputs.tag }}
+        # A shallow clone silently yields a 0.1.devN version instead of the tag.
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Setup Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.14'
+        cache: pip
+        cache-dependency-path: pyproject.toml
+
+    - name: Install Build Dependencies
+      run: pip install ".[build]"
+
+    # Resolve the version BEFORE building, so a wrong one is caught here rather
+    # than discovered as a confusingly-named file three steps later.
+    - name: Resolve Version
+      id: version
+      run: |
+        version="$(python -m setuptools_scm)"
+        echo "Building version: $version"
+        {
+          echo "version=$version"
+          echo "package=kubed_krm-${version}"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Build
+      run: python -m build
+
+    # Names come from the files on disk: a wheel carries a Python tag the
+    # version string does not.
+    - name: Resolve Artifact Names
+      id: files
+      run: |
+        {
+          echo "sdist=$(basename dist/*.tar.gz)"
+          echo "wheel=$(basename dist/*.whl)"
+        } >> "$GITHUB_OUTPUT"
+        ls -l dist
+
+    - name: Check Distribution Metadata
+      run: twine check --strict dist/*
+
+    # A clean venv proves the console scripts resolve and the KRM functions are
+    # registered — kustomize finds every function through those entry points, so
+    # a wheel that dropped them builds fine and fails in every kustomization.
+    - name: Verify the Wheel Installs
+      run: |
+        python -m venv /tmp/verify
+        /tmp/verify/bin/pip install --quiet "$(echo dist/*.whl)"
+        test -x /tmp/verify/bin/kubectl-kubed
+        /tmp/verify/bin/python - <<'EOF'
+        from importlib.metadata import entry_points
+        for group in ("krm.kubed.io", "serverless.krm.kubed.io", "grafana.krm.kubed.io"):
+          names = sorted(entry_points(group=group).names)
+          assert names, f"no entry points in {group}"
+          print(group, names)
+        EOF
+
+    - name: Upload Package
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.version.outputs.package }}
+        path: dist/
+        if-no-files-found: error
+
+    - name: Summary
+      env:
+        VERSION: ${{ steps.version.outputs.version }}
+        SDIST: ${{ steps.files.outputs.sdist }}
+        WHEEL: ${{ steps.files.outputs.wheel }}
+      run: |
+        cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+        ## Package
+
+        - **Version**: \`${VERSION}\`
+        - **sdist**: \`${SDIST}\`
+        - **wheel**: \`${WHEEL}\`
+        EOF

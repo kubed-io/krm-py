@@ -65,7 +65,7 @@ def load_yaml(file: str, all: bool = False) -> dict:
   try:
     c = get_file_contents(file)
     y = yaml.safe_load_all(c) if all else yaml.safe_load(c)
-  except yaml.YAMLError as exc:
+  except yaml.YAMLError:
     print("Error parsing input", file=sys.stderr)
     sys.exit(1)
   return y

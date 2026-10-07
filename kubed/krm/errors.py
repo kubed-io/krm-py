@@ -18,3 +18,23 @@ class FieldPathNotFound(KubedError, LookupError):
 def plugin_fail(message):
   print(message, file=sys.stderr)
   sys.exit(1)
+
+
+class EmbedError(KubedError):
+  """An Embed node could not be resolved to the file it names."""
+
+
+class TargetError(KubedError):
+  """A Target node matched the wrong number of resources."""
+
+
+class ElementNotFound(KubedError):
+  """A dashboard layout references an element that nothing provides."""
+
+
+class ConversionError(KubedError):
+  """A v2 panel could not be converted to the v1 panel model."""
+
+
+class LibraryError(KubedError):
+  """A GrafanaLibrary's own configuration is incomplete."""

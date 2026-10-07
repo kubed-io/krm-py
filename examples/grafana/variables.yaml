@@ -1,0 +1,16 @@
+# Embedded into the dashboard's variables, one variable per document, in this order.
+kind: QueryVariable
+spec:
+  name: pod
+  label: Pod
+  refresh: onDashboardLoad
+  query:
+    kind: Embed
+    spec:
+      file: pods-query.yaml
+---
+kind: TextVariable
+spec:
+  name: filter
+  label: Filter
+  query: ''

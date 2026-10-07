@@ -1,0 +1,21 @@
+# The one function: builds the labelled dashboards and library panels into one folder,
+# which it creates, and marks everything it used local-config.
+apiVersion: grafana.krm.kubed.io/v1alpha1
+kind: GrafanaLibrary
+metadata:
+  name: krm-examples
+  # transformer output misses the kustomization's namespace, so the library carries it
+  namespace: observe
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: kubectl-kubed
+spec:
+  folder:
+    title: KRM examples
+  panels:
+    matchLabels:
+      grafana.kubed.io/library-panel: krm-example
+  dashboards:
+    matchLabels:
+      grafana.kubed.io/dashboard: krm-example

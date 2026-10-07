@@ -1,0 +1,30 @@
+# Becomes a library panel: the library's panels selector matches its label. Its query
+# comes from the list through a Target.
+apiVersion: grafana.krm.kubed.io/v1alpha1
+kind: Panel
+metadata:
+  name: example-cpu
+  labels:
+    grafana.kubed.io/library-panel: krm-example
+  annotations:
+    grafana.krm.kubed.io/library-name: Example CPU
+spec:
+  title: CPU
+  data:
+    kind: QueryGroup
+    spec:
+      queries:
+      - kind: Target
+        spec:
+          kind: DataQuery
+          matchLabels:
+            panel: cpu
+  vizConfig:
+    kind: VizConfig
+    group: timeseries
+    spec:
+      fieldConfig:
+        defaults:
+          unit: percentunit
+        overrides: []
+      options: {}

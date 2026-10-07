@@ -1,0 +1,72 @@
+# Dependabot version updates (security updates are toggled in repo settings).
+#
+# House rules: weekly, grouped minor + patch per ecosystem with majors separate,
+# a one-week cooldown so a yanked release never reaches us, and a distinct
+# commit prefix per ecosystem.
+#
+# Docs: https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+version: 2
+updates:
+
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: weekly
+    day: monday
+  open-pull-requests-limit: 5
+  labels:
+  - dependencies
+  - github-actions
+  # skips the pr.yml changelog gate
+  - no changelog
+  commit-message:
+    prefix: ci(deps)
+  cooldown:
+    # github-actions is not semver-versioned, so only default-days is valid here.
+    default-days: 7
+  groups:
+    actions-minor-patch:
+      update-types:
+      - minor
+      - patch
+
+- package-ecosystem: pip
+  directory: /
+  schedule:
+    interval: weekly
+    day: monday
+  open-pull-requests-limit: 5
+  labels:
+  - dependencies
+  - python
+  - no changelog
+  commit-message:
+    prefix: deps(pip)
+  cooldown:
+    default-days: 7
+  groups:
+    pip-minor-patch:
+      update-types:
+      - minor
+      - patch
+
+# The python and kubed/krm base images in the Dockerfile.
+- package-ecosystem: docker
+  directory: /
+  schedule:
+    interval: weekly
+    day: monday
+  open-pull-requests-limit: 5
+  labels:
+  - dependencies
+  - docker
+  - no changelog
+  commit-message:
+    prefix: deps(docker)
+  cooldown:
+    default-days: 7
+  groups:
+    docker-minor-patch:
+      update-types:
+      - minor
+      - patch

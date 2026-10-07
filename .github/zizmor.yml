@@ -1,0 +1,38 @@
+# zizmor configuration — the CI supply-chain auditor run by quality.yml.
+#
+# Each entry is a place where zizmor's default disagrees with a deliberate
+# decision here. A finding that is merely inconvenient belongs fixed, not here.
+#
+# Docs: https://docs.zizmor.sh/configuration/
+rules:
+
+  # Release TAGS rather than commit hashes: Dependabot keeps them current with
+  # readable diffs, and every publisher used here protects its tags.
+  # kubed-io/actions publishes no tags and duplocloud/version-bump's main is
+  # ahead of its last tag, so both stay on @main, named here so it is visible.
+  unpinned-uses:
+    config:
+      policies:
+        kubed-io/*: ref-pin
+        duplocloud/*: ref-pin
+        pypa/gh-action-pypi-publish: ref-pin
+        "*": ref-pin
+
+  # `uses: ./.github/workflows/x.yml` is the only way to call a workflow in
+  # this repo.
+  self-repository:
+    ignore:
+    - publish.yml
+
+  # version-bump pushes the rolled changelog and tag through the credentials
+  # checkout leaves in the remote — that job exists for it. Its only artifact is
+  # written outside the checkout.
+  artipacked:
+    ignore:
+    - publish.yml
+
+  # softprops/action-gh-release is the house standard across kubed-io's
+  # publish.yml files.
+  superfluous-actions:
+    ignore:
+    - publish.yml

@@ -1,0 +1,18 @@
+# A local text panel whose content is a file.
+apiVersion: grafana.krm.kubed.io/v1alpha1
+kind: Panel
+metadata:
+  name: note
+spec:
+  title: ''
+  transparent: true
+  vizConfig:
+    kind: VizConfig
+    group: text
+    spec:
+      options:
+        mode: html
+        content:
+          kind: Embed
+          spec:
+            file: note.html

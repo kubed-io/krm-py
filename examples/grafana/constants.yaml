@@ -1,0 +1,23 @@
+# Variables as resources, pulled into the dashboard by a Target, which marks them
+# local-config. A Target sorts its matches by name, so these are named in display order.
+apiVersion: grafana.krm.kubed.io/v1alpha1
+kind: ConstantVariable
+metadata:
+  name: krm-example-1-namespace
+  labels:
+    dashboard: krm-example
+spec:
+  name: namespace
+  query: observe
+  hide: hideVariable
+---
+apiVersion: grafana.krm.kubed.io/v1alpha1
+kind: ConstantVariable
+metadata:
+  name: krm-example-2-selector
+  labels:
+    dashboard: krm-example
+spec:
+  name: k8s_selector
+  query: app.kubernetes.io/part-of=observe
+  hide: hideVariable

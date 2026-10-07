@@ -1,8 +1,6 @@
 
-import pytest
 from kubed.krm import common as c
 from kubed.krm.model import ResourceList, KObject
-import yaml
 
 def test_get_konfig():
     konfig = c.konfig("lastpass")
@@ -23,7 +21,7 @@ def test_res_class():
         "apiVersion": "bar",
         "kind": "Foo"
     }]
-    res = ResourceList(konfig, items)
+    ResourceList(konfig, items)  # building it must not raise
     # print(res)
     # c.dump(res)
     # for r in res:

@@ -7,7 +7,6 @@ Commands:
 """
 
 import sys
-import os
 import socket
 import time
 import zipfile
@@ -50,7 +49,7 @@ def pack(service_file, output=None, quiet=False):
     # Validate it's a Service kind
     if service.get('kind') != 'Service' or not service.get('apiVersion', '').startswith('serverless.krm.kubed.io'):
         if not quiet:
-            print(f"Error: File is not a serverless Service resource", file=sys.stderr)
+            print("Error: File is not a serverless Service resource", file=sys.stderr)
         sys.exit(1)
 
     spec = service.get('spec', {})
@@ -104,7 +103,7 @@ def pack(service_file, output=None, quiet=False):
 
     if not files_to_pack and not embedded_files:
         if not quiet:
-            print(f"Error: No files to pack (no include patterns and no embedded source)", file=sys.stderr)
+            print("Error: No files to pack (no include patterns and no embedded source)", file=sys.stderr)
         sys.exit(1)
 
     if not quiet:
@@ -224,7 +223,7 @@ def publish(service_file):
 
     # Validate it's a Service kind
     if service.get('kind') != 'Service' or not service.get('apiVersion', '').startswith('serverless.krm.kubed.io'):
-        print(f"Error: File is not a serverless Service resource", file=sys.stderr)
+        print("Error: File is not a serverless Service resource", file=sys.stderr)
         sys.exit(1)
 
     spec = service.get('spec', {})
@@ -242,7 +241,7 @@ def publish(service_file):
     zip_path, checksum = pack(service_file, output=None)
 
     # Upload to storagesvc
-    print(f"\nUploading to storagesvc...")
+    print("\nUploading to storagesvc...")
     source_url = _upload_to_storagesvc(zip_path)
     print(f"Stored at: {source_url}")
 

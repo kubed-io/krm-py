@@ -1,0 +1,56 @@
+name: 🔀 PR
+
+# Every PR must contribute a CHANGELOG entry, because that [Unreleased] section
+# becomes the release notes at publish time. A PR with no new entry fails here.
+# (The image and the tests are separate gates — see image.yml and test.yml.)
+#
+# There are two escape hatches, and they cover different things:
+#
+#   the `no changelog` label   a judgement call by a human, for work a user
+#                              would not read about in release notes
+#   the Dependabot guard below unconditional, because a bump is never that work
+#
+# Dependabot also *applies* the label via .github/dependabot.yml, so the guard
+# looks redundant. It is not. Dependabot can only apply a label that already
+# EXISTS in the repository and drops any that does not, silently and with no
+# warning anywhere — and a label is repository state that anyone can rename or
+# delete, while this guard is in the workflow with the rule it protects.
+
+on:
+  pull_request:
+    branches: [main]
+    # labeled/unlabeled so applying the `no changelog` label (e.g. Dependabot,
+    # or a late add) re-runs the gate with a fresh payload.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  # Auto-assign needs to write the assignee on the PR.
+  pull-requests: write
+
+jobs:
+  pr-tasks:
+    name: PR Tasks
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        # Nothing here pushes; the two actions below talk to the API with the
+        # job's token, not with a git remote.
+        persist-credentials: false
+
+    # Assign the PR author to their own PR per .github/assign.yml.
+    - name: Auto Assign
+      uses: kentaro-m/auto-assign-action@v2.0.2
+      with:
+        configuration-path: .github/assign.yml
+
+    # `pull_request.user.login`, not `github.actor`: on a `labeled` event the
+    # actor is whoever applied the label, so a human touching a Dependabot PR
+    # would put the gate back. The author is what actually identifies the PR.
+    - name: Make sure Changelog is updated
+      if: github.event.pull_request.user.login != 'dependabot[bot]'
+      uses: tarides/changelog-check-action@v4
+      with:
+        changelog: CHANGELOG.md

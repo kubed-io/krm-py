@@ -1,4 +1,5 @@
 ARG PY_VERSION=3.12 \
+    KRM_VERSION=v0.0.20 \
     TARGETPLATFORM \
     BUILDPLATFORM
 ##
@@ -26,16 +27,16 @@ RUN python -m build --no-isolation
 # This can be used with kustomize image annotations
 ##
 FROM python:${PY_VERSION}-slim AS slim
-COPY --from=builder /app/dist ./dist/
-RUN pip install --no-cache-dir ./dist/*.whl && \
-    rm -rf ./dist
+COPY --from=builder /app/dist /tmp/dist/
+RUN pip install --no-cache-dir /tmp/dist/*.whl && \
+    rm -rf /tmp/dist
 ENTRYPOINT [ "kubectl-kubed" ]
 
 ##
 # Final runtime image
 # This is pushed to the registry.
 ##
-FROM kubed/krm:latest AS suite
+FROM kubed/krm:${KRM_VERSION} AS suite
 ARG TARGETPLATFORM \
     BUILDPLATFORM
 
@@ -44,6 +45,8 @@ RUN apk --no-cache add \
         py3-pip \
         ncurses
 
+# the venv lands where PATH below expects it; the base image works in /kubed
+WORKDIR /workspace
 COPY --from=builder /app/dist ./dist/
 
 # RUN pip install --break-system-packages --no-cache-dir ./dist/*.whl && \
@@ -73,6 +76,7 @@ ARG NODE_VERSION="none" \
     KUSTOMIZE_VERSION="v5.7.1" \
     TARGETPLATFORM \
     BUILDPLATFORM
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN <<EOF 
 export DEBIAN_FRONTEND=noninteractive && apt-get update
 apt-get -y install --no-install-recommends direnv python3-venv

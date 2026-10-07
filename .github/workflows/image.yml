@@ -1,0 +1,108 @@
+name: 📸 Image Builder
+
+# Builds the kubed/krm-py images (the `slim` function image and the `suite`
+# toolbox) with buildx bake over docker-compose.yaml:
+#
+#   push: main          push :main + :latest
+#   workflow_dispatch   manual build (push toggle)
+#   workflow_call       publish.yml passes the version tag — checks out that tag
+#                       and pushes :vX.Y.Z
+#
+# Not run on pull_request: a two-arch build is most of a PR's wait for a signal
+# quality.yml (hadolint) and package.yml (the wheel the image wraps) already give.
+# No `push: tags` trigger either: publish.yml calls this, so the image exists
+# before the GitHub Release does.
+
+on:
+  push:
+    branches: [main]
+    paths:
+    - Dockerfile
+    - docker-compose.yaml
+    - .python-version
+    - pyproject.toml
+    - kubed/**
+    - .github/workflows/image.yml
+  workflow_dispatch:
+    inputs:
+      push:
+        description: Push to registry
+        type: boolean
+        required: false
+        default: true
+  workflow_call:
+    inputs:
+      tag:
+        description: Git tag to check out and stamp the image with (empty = current ref)
+        type: string
+        required: false
+        default: ''
+      push:
+        description: Push to registry
+        type: boolean
+        required: false
+        default: false
+
+# A new run waits for an in-flight one instead of racing its buildx cache.
+concurrency:
+  group: image-${{ github.ref }}
+
+jobs:
+  image:
+    name: Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # true only for a real registry push; gates the GCP steps and the
+      # environment, so dry builds never touch GCP or a protected env.
+      PUSH: ${{ (github.event_name == 'push' || ((github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.push)) && 'true' || 'false' }}
+    environment:
+      name: ${{ (github.event_name == 'push' || ((github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.push)) && 'dockerhub' || '' }}
+      url: https://hub.docker.com/r/kubed/krm-py
+    steps:
+
+    - name: Checkout Code
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ inputs.tag }}
+        # setuptools_scm derives the version from git history, not just HEAD.
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Authenticate to GCP
+      if: env.PUSH == 'true'
+      uses: google-github-actions/auth@v3
+      with:
+        workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+        service_account: github@${{ vars.GCP_PROJECT }}.iam.gserviceaccount.com
+
+    - name: Get Docker Hub Credentials
+      id: secrets
+      if: env.PUSH == 'true'
+      uses: google-github-actions/get-secretmanager-secrets@v3
+      with:
+        secrets: |-
+          dockerhub:${{ vars.GCP_PROJECT }}/dockerhub
+
+    # docker-compose.yaml reads PY_VERSION as the base image's Python, and an
+    # unset one becomes an empty build arg, not the Dockerfile's default.
+    # GIT_TAG is the release tag, else latest.
+    - name: Resolve Image Args
+      env:
+        CALL_TAG: ${{ inputs.tag }}
+      run: |
+        {
+          echo "PY_VERSION=$(cat .python-version)"
+          echo "GIT_TAG=${CALL_TAG:-latest}"
+        } >> "$GITHUB_ENV"
+
+    - name: Build and Push
+      uses: kubed-io/actions/build-image@main
+      with:
+        push: ${{ env.PUSH }}
+        # Short-circuit before fromJson when not pushing (secrets step skipped).
+        username: ${{ env.PUSH == 'true' && fromJson(steps.secrets.outputs.dockerhub).username || '' }}
+        password: ${{ env.PUSH == 'true' && fromJson(steps.secrets.outputs.dockerhub).password || '' }}
+        repository: kubed/krm-py
