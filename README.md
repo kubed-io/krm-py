@@ -47,3 +47,10 @@ spec:
 
 See [`examples/random`](examples/random/) and
 [`docs/transformers/random.md`](docs/transformers/random.md).
+
+## Grafana
+
+Panels, dashboards and folders as kustomize resources (`grafana.krm.kubed.io`), deployed
+through grafana-operator. Write a panel as a v2 panel spec; `Embed` pulls files in and
+`Target` pulls resources from the list. See [`examples/grafana`](examples/grafana/) and
+[`docs/generators/grafana.md`](docs/generators/grafana.md).

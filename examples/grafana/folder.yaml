@@ -1,0 +1,14 @@
+apiVersion: grafana.krm.kubed.io/v1alpha1
+kind: Folder
+metadata:
+  name: krm-examples
+  namespace: observe
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: kubectl-kubed
+spec:
+  title: KRM examples
+  target:
+    matchLabels:
+      grafana.kubed.io/folder: krm-examples

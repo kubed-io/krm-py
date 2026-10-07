@@ -1,0 +1,26 @@
+# A local panel whose query is a file next to it.
+apiVersion: grafana.krm.kubed.io/v1alpha1
+kind: Panel
+metadata:
+  name: up
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: kubectl-kubed
+spec:
+  title: Targets up
+  data:
+    kind: QueryGroup
+    spec:
+      queries:
+      - kind: Embed
+        spec:
+          file: up-query.yaml
+  vizConfig:
+    kind: VizConfig
+    group: stat
+    spec:
+      options:
+        reduceOptions:
+          calcs:
+          - lastNotNull

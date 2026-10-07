@@ -1,0 +1,33 @@
+# A library panel, run as a transformer so it can select its query from the list.
+# Transformer output misses the kustomization's namespace, so it is set here.
+apiVersion: grafana.krm.kubed.io/v1alpha1
+kind: Panel
+metadata:
+  name: example-cpu
+  namespace: observe
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: kubectl-kubed
+spec:
+  library:
+    name: Example CPU
+  title: CPU
+  data:
+    kind: QueryGroup
+    spec:
+      queries:
+      - kind: Target
+        spec:
+          kind: DataQuery
+          matchLabels:
+            panel: cpu
+  vizConfig:
+    kind: VizConfig
+    group: timeseries
+    spec:
+      fieldConfig:
+        defaults:
+          unit: percentunit
+        overrides: []
+      options: {}

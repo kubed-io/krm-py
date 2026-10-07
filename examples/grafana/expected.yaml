@@ -1,0 +1,174 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaFolder
+metadata:
+  annotations:
+    config.kubernetes.io/origin: |
+      configuredIn: folder.yaml
+      configuredBy:
+        apiVersion: grafana.krm.kubed.io/v1alpha1
+        kind: Folder
+        name: krm-examples
+        namespace: observe
+    grafana.krm.kubed.io/kind: Folder
+  name: krm-examples
+  namespace: observe
+spec:
+  allowCrossNamespaceImport: true
+  instanceSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  title: KRM examples
+  uid: krm-examples
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaLibraryPanel
+metadata:
+  annotations:
+    config.kubernetes.io/origin: |
+      configuredIn: panels/cpu.yaml
+      configuredBy:
+        apiVersion: grafana.krm.kubed.io/v1alpha1
+        kind: Panel
+        name: example-cpu
+        namespace: observe
+    grafana.krm.kubed.io/kind: Panel
+  name: example-cpu
+  namespace: observe
+spec:
+  allowCrossNamespaceImport: true
+  instanceSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  json: '{"datasource":{"type":"prometheus","uid":"prometheus"},"fieldConfig":{"defaults":{"unit":"percentunit"}},"name":"Example
+    CPU","options":{},"targets":[{"datasource":{"type":"prometheus","uid":"prometheus"},"expr":"sum(rate(container_cpu_usage_seconds_total{namespace=\"observe\"}[$__rate_interval]))","legendFormat":"cpu","refId":"cpu"}],"title":"CPU","type":"timeseries","uid":"example-cpu"}'
+  uid: example-cpu
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaManifest
+metadata:
+  annotations:
+    config.kubernetes.io/origin: |
+      configuredIn: dashboard.yaml
+      configuredBy:
+        apiVersion: grafana.krm.kubed.io/v1alpha1
+        kind: Dashboard
+        name: krm-example
+        namespace: observe
+    grafana.krm.kubed.io/kind: Dashboard
+  labels:
+    grafana.kubed.io/folder: krm-examples
+  name: krm-example
+  namespace: observe
+spec:
+  allowCrossNamespaceImport: true
+  instanceSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  resyncPeriod: 24h
+  template:
+    apiVersion: dashboard.grafana.app/v2
+    kind: Dashboard
+    metadata:
+      annotations:
+        grafana.app/folder: krm-examples
+      name: krm-example
+    spec:
+      elements:
+        example-cpu:
+          kind: LibraryPanel
+          spec:
+            id: 3
+            libraryPanel:
+              name: Example CPU
+              uid: example-cpu
+            title: CPU
+        note:
+          kind: Panel
+          spec:
+            id: 1
+            title: ""
+            transparent: true
+            vizConfig:
+              group: text
+              kind: VizConfig
+              spec:
+                options:
+                  content: |
+                    <p>Built from <code>examples/grafana</code>.</p>
+                  mode: html
+        up:
+          kind: Panel
+          spec:
+            data:
+              kind: QueryGroup
+              spec:
+                queries:
+                - kind: PanelQuery
+                  spec:
+                    hidden: false
+                    query:
+                      datasource:
+                        name: prometheus
+                      group: prometheus
+                      kind: DataQuery
+                      spec:
+                        expr: up
+                      version: v0
+                    refId: up
+            id: 2
+            title: Targets up
+            vizConfig:
+              group: stat
+              kind: VizConfig
+              spec:
+                options:
+                  reduceOptions:
+                    calcs:
+                    - lastNotNull
+      layout:
+        kind: RowsLayout
+        spec:
+          rows:
+          - kind: RowsLayoutRow
+            spec:
+              hideHeader: true
+              layout:
+                kind: GridLayout
+                spec:
+                  items:
+                  - kind: GridLayoutItem
+                    spec:
+                      element:
+                        kind: ElementReference
+                        name: note
+                      height: 3
+                      width: 24
+                      x: 0
+                      "y": 0
+              title: ""
+          - kind: RowsLayoutRow
+            spec:
+              layout:
+                kind: GridLayout
+                spec:
+                  items:
+                  - kind: GridLayoutItem
+                    spec:
+                      element:
+                        kind: ElementReference
+                        name: up
+                      height: 6
+                      width: 12
+                      x: 0
+                      "y": 0
+                  - kind: GridLayoutItem
+                    spec:
+                      element:
+                        kind: ElementReference
+                        name: example-cpu
+                      height: 6
+                      width: 12
+                      x: 12
+                      "y": 0
+              title: Overview
+      title: KRM example
