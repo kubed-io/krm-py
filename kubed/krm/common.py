@@ -131,7 +131,7 @@ def krm_init() -> dict:
   """
   # if pipeline
   if not sys.stdin.isatty():
-    res = list(yaml.safe_load_all(sys.stdin))
+    res = list(files.load_all(sys.stdin))
   else:
     res = []
 

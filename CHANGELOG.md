@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- a bare `=` in YAML reads as the string `=`: kustomize unquotes it (a Cloud Monitoring filter's operator, for one), and PyYAML's SafeLoader refused it as a YAML 1.1 value tag
+
 ## [0.0.8] - 2026-10-09
 
 ## [0.0.7] - 2026-10-09

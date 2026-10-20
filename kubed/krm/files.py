@@ -5,6 +5,30 @@ import json
 import sys
 from .errors import plugin_fail
 
+
+class Loader(yaml.SafeLoader):
+  """SafeLoader without YAML 1.1's `=` value tag, so a bare `=` reads as the string it is.
+
+  kustomize writes YAML 1.2 and drops the quotes from `'='` (a Cloud Monitoring filter's
+  operator, for one), which SafeLoader then refuses as `tag:yaml.org,2002:value`.
+  """
+
+
+Loader.yaml_implicit_resolvers = {
+  ch: [r for r in resolvers if r[0] != "tag:yaml.org,2002:value"]
+  for ch, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+
+
+def load(stream):
+  """yaml.safe_load, with a bare `=` as a string."""
+  return yaml.load(stream, Loader=Loader)
+
+
+def load_all(stream):
+  """yaml.safe_load_all, with a bare `=` as a string."""
+  return yaml.load_all(stream, Loader=Loader)
+
 def get_file_contents(file: str) -> str:
   """Get File Contents
   
@@ -64,7 +88,7 @@ def load_yaml(file: str, all: bool = False) -> dict:
   """
   try:
     c = get_file_contents(file)
-    y = yaml.safe_load_all(c) if all else yaml.safe_load(c)
+    y = load_all(c) if all else load(c)
   except yaml.YAMLError:
     print("Error parsing input", file=sys.stderr)
     sys.exit(1)
@@ -83,7 +107,7 @@ def parse_from(contents: str, mimeType: str = "yaml") -> dict:
     The dictionary parsed from the content. 
   """
   if mimeType == "yaml":
-    return yaml.safe_load(contents)
+    return load(contents)
   elif mimeType == "json":
     return json.loads(contents)
   else:

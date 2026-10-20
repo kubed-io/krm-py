@@ -26,7 +26,7 @@ def base_of(res: dict):
   origin = res.get("metadata", {}).get("annotations", {}).get(ORIGIN)
   if not origin:
     return "."
-  o = yaml.safe_load(origin)
+  o = f.load(origin)
   if o.get("repo"):
     return None
   return os.path.dirname(o.get("path", "")) or "."
@@ -123,7 +123,7 @@ def _embed(spec, base, items, seen, used=None):
         raise EmbedError(f"Embed {file}: parse needs a yaml or json file, {p} is {ftype}")
       out.append((stem, f.parse_to(f.parse_from(text, ftype), spec["parse"])))
     elif ftype in ("yaml", "json") and spec.get("nested", True):
-      docs = [d for d in yaml.safe_load_all(text) if d is not None] if ftype == "yaml" else [json.loads(text)]
+      docs = [d for d in f.load_all(text) if d is not None] if ftype == "yaml" else [json.loads(text)]
       inner = os.path.dirname(p) or "."
       for d in docs:
         name = d.get("metadata", {}).get("name", stem) if isinstance(d, dict) else stem
