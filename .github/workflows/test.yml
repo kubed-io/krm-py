@@ -2,14 +2,14 @@ name: 🧪 Test
 
 # Lint and the test suite. The matrix is event-shaped:
 #
-#   pull_request     3.10 + 3.14 — the fast gate, at both ends of the range
-#   push: main       3.10 → 3.14 — the compatibility sweep, once the change has
+#   pull_request     3.12 + 3.15 — the fast gate, at both ends of the range
+#   push: main       3.12 → 3.15 — the compatibility sweep, once the change has
 #                    landed and nobody is blocked on it
 #   workflow_call    full matrix too — publish.yml runs this before it cuts a
 #                    version, so a release never ships an interpreter it has not
 #                    been tested on
 #
-# pyproject declares requires-python >=3.10.
+# pyproject declares requires-python >=3.12.
 
 on:
   # No `paths` filter on pull_request, deliberately. This job is a REQUIRED
@@ -44,9 +44,9 @@ jobs:
       # "the first one to".
       fail-fast: false
       matrix:
-        # Keep 3.14 last-listed and present in BOTH arms: `Test (3.14)` is the
+        # Keep 3.15 last-listed and present in BOTH arms: `Test (3.15)` is the
         # required status check, so it has to report on every pull request.
-        python-version: ${{ github.event_name == 'pull_request' && fromJSON('["3.10", "3.14"]') || fromJSON('["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
+        python-version: ${{ github.event_name == 'pull_request' && fromJSON('["3.12", "3.15"]') || fromJSON('["3.12", "3.13", "3.14", "3.15"]') }}
     steps:
 
     - name: Checkout

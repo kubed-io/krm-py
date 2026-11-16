@@ -3,7 +3,7 @@ name: 🧬 Publish Version
 # Manual, intentional release. Each job owns one thing, ordered so nothing
 # outward-facing happens until every artifact it refers to exists:
 #
-#   test    → the full 3.10 → 3.14 matrix; gates everything below
+#   test    → the full 3.12 → 3.15 matrix; gates everything below
 #   version → roll CHANGELOG [Unreleased], commit + tag on main. The ONLY job
 #             that writes a file or a tag; it emits the tag used downstream.
 #   image   → check out that tag and push kubed/krm-py:<tag>
