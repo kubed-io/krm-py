@@ -31,7 +31,7 @@ permissions:
 jobs:
   pr-tasks:
     name: PR Tasks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
     - name: Checkout
       uses: actions/checkout@v7
