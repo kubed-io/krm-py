@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.9] - 2026-11-16
+
 - requires Python 3.12 or newer (was 3.10), and is tested on 3.12 through 3.15
 - a bare `=` in YAML reads as the string `=`: kustomize unquotes it (a Cloud Monitoring filter's operator, for one), and PyYAML's SafeLoader refused it as a YAML 1.1 value tag
 
