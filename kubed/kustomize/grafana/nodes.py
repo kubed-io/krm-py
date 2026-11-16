@@ -8,7 +8,6 @@ import copy
 import glob
 import json
 import os
-import yaml
 from kubed.krm import common as c, files as f
 from kubed.krm.errors import EmbedError, TargetError
 
