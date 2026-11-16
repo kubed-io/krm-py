@@ -3,7 +3,7 @@ name = "kubed-krm"
 description = "Python implementation of the Kubernetes KRM Function Interface"
 readme = "README.md"
 dynamic = ["version"]
-requires-python = ">=3.10.0"
+requires-python = ">=3.12.0"
 keywords = [
     "kubernetes",
     "krm",
@@ -84,7 +84,7 @@ omit = [
 
 [tool.ruff]
 # The oldest interpreter supported, so ruff flags what would break there.
-target-version = "py310"
+target-version = "py312"
 # Sphinx's conf.py imports the package to prove autodoc can, not to use it.
 extend-exclude = ["docs"]
 
