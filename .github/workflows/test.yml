@@ -9,13 +9,15 @@ name: 🧪 Test
 #                    version, so a release never ships an interpreter it has not
 #                    been tested on
 #
-# pyproject declares requires-python >=3.12.
+# pyproject declares requires-python >=3.12. Each leg only uploads its JUnit
+# XML; `Test results` publishes them as one report and is the required check,
+# so moving the matrix never means editing the branch rules.
 
 on:
-  # No `paths` filter on pull_request, deliberately. This job is a REQUIRED
-  # status check, and a path-filtered required check never reports on a PR that
-  # misses the filter — GitHub then waits for it forever and the PR can never
-  # merge. The push filter below is fine: nothing gates on it.
+  # No `paths` filter on pull_request, deliberately. `Test results` is the
+  # REQUIRED status check, and a path-filtered required check never reports on a
+  # PR that misses the filter — GitHub then waits for it forever and the PR can
+  # never merge. The push filter below is fine: nothing gates on it.
   pull_request:
     branches: [main]
   push:
@@ -36,7 +38,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     strategy:
@@ -44,8 +46,6 @@ jobs:
       # "the first one to".
       fail-fast: false
       matrix:
-        # Keep 3.15 last-listed and present in BOTH arms: `Test (3.15)` is the
-        # required status check, so it has to report on every pull request.
         python-version: ${{ github.event_name == 'pull_request' && fromJSON('["3.12", "3.15"]') || fromJSON('["3.12", "3.13", "3.14", "3.15"]') }}
     steps:
 
@@ -82,4 +82,65 @@ jobs:
       run: ruff check .
 
     - name: Test
-      run: pytest
+      run: pytest --junit-xml=dist/test-results.xml
+
+    # Even when pytest fails: a failing leg is the one whose report matters.
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        # Unique per leg: artifacts with the same name collide.
+        name: test-results-${{ matrix.python-version }}
+        path: dist/test-results.xml
+        retention-days: 7
+        if-no-files-found: error
+
+  # Every leg's results as one report (a sticky PR comment and a check run that
+  # annotates a failing test), and the one check to require. It runs whatever
+  # the legs did, so a failing leg still publishes, then fails here.
+  results:
+    name: Test results
+    needs: test
+    if: always()
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    steps:
+
+    # No merge-multiple: every leg's file is test-results.xml, so merged they
+    # would overwrite each other; each artifact lands in its own directory.
+    - name: Download Every Leg's Results
+      uses: actions/download-artifact@v8
+      with:
+        path: results
+        pattern: test-results-*
+
+    # An overwrite is silent: the report looks healthy and describes a smaller
+    # run. One report per leg directory, without naming how many legs there are.
+    - name: Every Leg Is Present
+      run: |
+        dirs=$(find results -mindepth 1 -maxdepth 1 -type d | wc -l)
+        files=$(find results -name '*.xml' | wc -l)
+        echo "legs: $dirs, reports: $files"
+        [ "$dirs" -gt 0 ] || { echo "::error::no leg uploaded a report"; exit 1; }
+        [ "$dirs" -eq "$files" ] || { echo "::error::$dirs legs, $files reports"; exit 1; }
+
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      with:
+        check_name: Unit test results
+        files: results/**/*.xml
+        comment_mode: always
+        # The last step fails the job on a failing leg; a reporting hiccup
+        # should not be a second red X for the same failure.
+        action_fail: false
+
+    - name: Every Leg Passed
+      if: needs.test.result != 'success'
+      env:
+        RESULT: ${{ needs.test.result }}
+      run: |
+        echo "::error::the test matrix ended $RESULT"
+        exit 1

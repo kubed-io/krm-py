@@ -49,11 +49,17 @@ jobs:
   test:
     name: Test
     uses: ./.github/workflows/test.yml
+    # A called job gets no more than its caller grants, and test.yml's results
+    # job asks for these to post its check run.
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
 
   version:
     name: Version
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write   # commit the rolled CHANGELOG and push the tag to main
       id-token: write   # GCP workload-identity federation, for the App token
@@ -157,7 +163,7 @@ jobs:
     name: PyPI
     needs: package
     if: inputs.push
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     environment:
       name: pypi
       url: https://pypi.org/project/kubed-krm
@@ -183,7 +189,7 @@ jobs:
     - package
     - pypi
     if: inputs.push
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write   # create the GitHub Release on the existing tag
     steps:
