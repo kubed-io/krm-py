@@ -29,7 +29,7 @@ jobs:
   # are as much attack surface as the Python is.
   codeql:
     name: CodeQL
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       # Publish findings to Security → Code scanning, and onto the PR.
@@ -54,7 +54,7 @@ jobs:
   # Known-vulnerability audit of what a `pip install kubed-krm` actually pulls.
   deps:
     name: Dependency Audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -101,7 +101,7 @@ jobs:
   # relaxation live in .github/zizmor.yml.
   actions:
     name: Workflow Audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       security-events: write
@@ -124,7 +124,7 @@ jobs:
   # Exclusions and their reasons live in .hadolint.yaml.
   docker:
     name: Dockerfile Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
